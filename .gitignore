@@ -1,0 +1,7 @@
+*.xlsx
+*.xls
+*.pyc
+__pycache__/
+*.py
+bp_data.js
+historico/

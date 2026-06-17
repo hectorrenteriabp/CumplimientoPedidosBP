@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test: Cooler Name Resolution</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#0a1a0d; color:#e0e0e0; padding:20px; }
+  h1 { color:#4CAF50; margin-bottom:12px; font-size:22px; }
+  h2 { color:#81C784; margin:20px 0 10px; font-size:16px; }
+  .test { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:16px; margin:10px 0; }
+  .pass { border-left:4px solid #4CAF50; }
+  .fail { border-left:4px solid #EF4444; }
+  .label { font-size:12px; color:#999; margin-bottom:4px; }
+  .value { font-size:14px; font-weight:700; }
+  .green { color:#4CAF50; }
+  .red { color:#EF4444; }
+  pre { background:rgba(0,0,0,.3); padding:10px; border-radius:8px; font-size:11px; overflow-x:auto; margin:8px 0; }
+  .summary { background:rgba(76,175,80,.1); border:1px solid rgba(76,175,80,.3); border-radius:12px; padding:20px; margin:20px 0; text-align:center; }
+  .summary.fail-summary { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); }
+  .btn { background:#4CAF50; color:#fff; border:none; border-radius:8px; padding:10px 20px; cursor:pointer; font-size:14px; font-weight:700; margin:10px 5px; }
+  .btn:hover { background:#388E3C; }
+  #whatsapp-preview { background:rgba(0,0,0,.3); border-radius:12px; padding:16px; margin:10px 0; white-space:pre-wrap; font-family:monospace; font-size:13px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<h1>🧪 Test: Resolución de Nombre de Cooler en Embarques</h1>
+<p style="color:#999;margin-bottom:20px">Esta prueba verifica que al crear un embarque manual, el cooler muestre el NOMBRE (ej. "Tala") en vez del NÚMERO/CÓDIGO (ej. "6" o "FTAL").</p>
+
+<div id="results"></div>
+<div id="whatsapp-section"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// SIMULAR los datos D tal como los genera el Python (bp_data.js)
+// ══════════════════════════════════════════════════════════════════
+window.D = {
+  meta: {
+    today: "2026-06-17",
+    // CASO REAL: Python genera esto como ARRAY de códigos SAP
+    coolers: ["FABS", "FTUX", "FSAY", "FREY", "FPER", "FQUI", "FTAL", "FTAC", "FQUE", "FIXT", "FPAZ"],
+    actualizado: "2026-06-17 09:00",
+    version: "4.2"
+  },
+  plan_dia: {
+    lineas: [
+      { OV: "47730", Cooler: "FTAL", CoolerNombre: "Tala", CoolerOpciones: [
+        {sap: "FTAL", nombre: "Tala", inv: 500},
+        {sap: "FREY", nombre: "Los Reyes", inv: 300}
+      ]},
+      { OV: "47732", Cooler: "FREY", CoolerNombre: "Los Reyes", CoolerOpciones: [
+        {sap: "FREY", nombre: "Los Reyes", inv: 200},
+        {sap: "FPER", nombre: "Periban", inv: 150},
+        {sap: "FSAY", nombre: "Sayula", inv: 100}
+      ]},
+      { OV: "47733", Cooler: "FTAC", CoolerNombre: "Tacambaro", CoolerOpciones: [
+        {sap: "FTAC", nombre: "Tacambaro", inv: 800},
+        {sap: "FTUX", nombre: "Tuxpan", inv: 600},
+        {sap: "FQUI", nombre: "Quila", inv: 400},
+        {sap: "FQUE", nombre: "Queseria", inv: 200}
+      ]},
+      { OV: "47734", Cooler: "FABS", CoolerNombre: "Abasolo", CoolerOpciones: [] },
+      { OV: "47735", Cooler: "FIXT", CoolerNombre: "Ixtlan", CoolerOpciones: [] },
+      { OV: "47736", Cooler: "FPAZ", CoolerNombre: "La Paz", CoolerOpciones: [] }
+    ]
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════
+// COPIAR las funciones corregidas del dashboard
+// ══════════════════════════════════════════════════════════════════
+var _coolersMap = {};
+function _buildCoolersMap(){
+  _coolersMap = {};
+  if(window.D && window.D.meta && window.D.meta.coolers){
+    var c = window.D.meta.coolers;
+    if(Array.isArray(c)){
+      c.forEach(function(code){ if(code) _coolersMap[code] = code; });
+    } else if(typeof c === 'object'){
+      Object.keys(c).forEach(function(k){ _coolersMap[k] = c[k] || k; });
+    }
+  }
+  if(window.D && window.D.plan_dia && window.D.plan_dia.lineas){
+    window.D.plan_dia.lineas.forEach(function(l){
+      if(l.Cooler && l.CoolerNombre) _coolersMap[l.Cooler] = l.CoolerNombre;
+      if(l.CoolerOpciones){
+        l.CoolerOpciones.forEach(function(o){
+          if(o.sap && o.nombre) _coolersMap[o.sap] = o.nombre;
+        });
+      }
+    });
+  }
+}
+function _getCoolerNombre(code){
+  if(!code) return '';
+  if(_coolersMap[code]) return _coolersMap[code];
+  if(window.D && window.D.meta && window.D.meta.coolers && !Array.isArray(window.D.meta.coolers)){
+    return window.D.meta.coolers[code] || code;
+  }
+  return code;
+}
+
+// Build the map
+_buildCoolersMap();
+
+// ══════════════════════════════════════════════════════════════════
+// RUN TESTS
+// ══════════════════════════════════════════════════════════════════
+var results = [];
+
+function test(name, actual, expected) {
+  var pass = actual === expected;
+  results.push({ name, actual, expected, pass });
+}
+
+// Test 1: _coolersMap fue construido correctamente
+test(
+  'FTAL resuelve a "Tala" (no a "FTAL" ni a undefined)',
+  _getCoolerNombre('FTAL'),
+  'Tala'
+);
+
+test(
+  'FREY resuelve a "Los Reyes"',
+  _getCoolerNombre('FREY'),
+  'Los Reyes'
+);
+
+test(
+  'FTAC resuelve a "Tacambaro"',
+  _getCoolerNombre('FTAC'),
+  'Tacambaro'
+);
+
+test(
+  'FPER resuelve a "Periban" (viene de CoolerOpciones)',
+  _getCoolerNombre('FPER'),
+  'Periban'
+);
+
+test(
+  'FSAY resuelve a "Sayula" (viene de CoolerOpciones)',
+  _getCoolerNombre('FSAY'),
+  'Sayula'
+);
+
+test(
+  'FABS resuelve a "Abasolo"',
+  _getCoolerNombre('FABS'),
+  'Abasolo'
+);
+
+test(
+  'FTUX resuelve a "Tuxpan"',
+  _getCoolerNombre('FTUX'),
+  'Tuxpan'
+);
+
+test(
+  'FQUI resuelve a "Quila"',
+  _getCoolerNombre('FQUI'),
+  'Quila'
+);
+
+test(
+  'FQUE resuelve a "Queseria"',
+  _getCoolerNombre('FQUE'),
+  'Queseria'
+);
+
+test(
+  'FIXT resuelve a "Ixtlan"',
+  _getCoolerNombre('FIXT'),
+  'Ixtlan'
+);
+
+test(
+  'FPAZ resuelve a "La Paz"',
+  _getCoolerNombre('FPAZ'),
+  'La Paz'
+);
+
+test(
+  'Código vacío retorna ""',
+  _getCoolerNombre(''),
+  ''
+);
+
+// Test: Simular lo que hace saveManualShipment
+var testCoolerCode = 'FTAL';
+var coolerNom = _getCoolerNombre(testCoolerCode);
+test(
+  'saveManualShipment: CoolerSalidaNom para "FTAL" = "Tala"',
+  coolerNom,
+  'Tala'
+);
+
+// Test: Verificar el mapa completo tiene todos los coolers
+var mapKeys = Object.keys(_coolersMap).sort();
+test(
+  '_coolersMap tiene 11 coolers',
+  mapKeys.length.toString(),
+  '11'
+);
+
+// Test: Simular texto WhatsApp
+var e = {
+  CoolerSalida: 'FTAL',
+  CoolerSalidaNom: 'Tala',
+  Unidad: 'EMBARQUE COSTCO',
+  Fecha: '2026-06-17',
+  DestinoNorm: 'MEXICO, DF',
+  CajasTotal: 800,
+  PalletsAsignados: 11,
+  OVsDetalle: [{ ov: '47732', pedido: 800, cajas: 600, stock: 600 }]
+};
+var coolerCode = e.CoolerSalida || '';
+var coolerNomWA = e.CoolerSalidaNom || _getCoolerNombre(coolerCode) || coolerCode;
+var coolerDisplay = coolerNomWA && coolerNomWA !== coolerCode ? coolerCode + ' — ' + coolerNomWA : coolerCode;
+
+test(
+  'WhatsApp: Cooler display = "FTAL — Tala"',
+  coolerDisplay,
+  'FTAL — Tala'
+);
+
+// Test con embarque que solo tiene CoolerSalida (sin CoolerSalidaNom)
+var e2 = { CoolerSalida: 'FREY', CoolerSalidaNom: '' };
+var coolerCode2 = e2.CoolerSalida || '';
+var coolerNomWA2 = e2.CoolerSalidaNom || _getCoolerNombre(coolerCode2) || coolerCode2;
+var coolerDisplay2 = coolerNomWA2 && coolerNomWA2 !== coolerCode2 ? coolerCode2 + ' — ' + coolerNomWA2 : coolerCode2;
+test(
+  'WhatsApp fallback: sin CoolerSalidaNom, FREY → "FREY — Los Reyes"',
+  coolerDisplay2,
+  'FREY — Los Reyes'
+);
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════════
+var html = '';
+var passCount = 0;
+var failCount = 0;
+
+results.forEach(function(r){
+  if(r.pass) passCount++; else failCount++;
+  html += '<div class="test '+(r.pass?'pass':'fail')+'">'
+    + '<div class="label">'+r.name+'</div>'
+    + '<div class="value '+(r.pass?'green':'red')+'">'
+    + (r.pass ? '✅ PASS' : '❌ FAIL')
+    + ' → '+(r.pass ? r.actual : 'Esperado: "'+r.expected+'" | Obtenido: "'+r.actual+'"')
+    + '</div></div>';
+});
+
+var allPass = failCount === 0;
+html += '<div class="summary '+(allPass?'':'fail-summary')+'">'
+  + '<div style="font-size:48px;margin-bottom:10px">'+(allPass?'🎉':'😞')+'</div>'
+  + '<div style="font-size:20px;font-weight:800;color:'+(allPass?'#4CAF50':'#EF4444')+'">'
+  + (allPass ? 'TODOS LOS TESTS PASARON' : failCount+' TEST(S) FALLARON')
+  + '</div>'
+  + '<div style="font-size:14px;color:#999;margin-top:8px">'+passCount+' pasaron / '+failCount+' fallaron de '+results.length+' total</div>'
+  + '</div>';
+
+html += '<h2>📋 Mapa de Coolers Construido</h2>';
+html += '<pre>';
+Object.keys(_coolersMap).sort().forEach(function(k){
+  html += k + ' → ' + _coolersMap[k] + '\n';
+});
+html += '</pre>';
+
+html += '<h2>📊 Datos Originales de D.meta.coolers (tipo: '+typeof window.D.meta.coolers+')</h2>';
+html += '<pre>'+JSON.stringify(window.D.meta.coolers, null, 2)+'</pre>';
+
+document.getElementById('results').innerHTML = html;
+
+// WhatsApp preview
+var waHtml = '<h2>📱 Preview del texto WhatsApp generado</h2>';
+var lines = [];
+lines.push('🍓 *BERRIES PARADISE — EMBARQUE*');
+lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
+lines.push('🚛 *EMBARQUE COSTCO*');
+lines.push('📅 Fecha: *2026-06-17*');
+lines.push('📍 Destino: *MEXICO, DF*');
+lines.push('🏭 Cooler salida: *'+coolerDisplay+'*');
+lines.push('📦 Cajas: *800*  |  🏗 Pallets: *11.0*');
+lines.push('🟡 Cumplimiento global: *75%*');
+waHtml += '<div id="whatsapp-preview">'+lines.join('\n')+'</div>';
+waHtml += '<p style="color:#4CAF50;font-weight:700;margin-top:10px">✅ Antes: "Cooler salida: 1" → Ahora: "Cooler salida: FTAL — Tala"</p>';
+
+document.getElementById('whatsapp-section').innerHTML = waHtml;
+</script>
+</body>
+</html>

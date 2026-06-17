@@ -3956,17 +3956,7 @@ function openSkuOvModal(ovId, sku, cajasActuales, pedido){
   
   // Poblar select de coolers dinámicamente
   var coolerSel = document.getElementById('sku-ov-modal-cooler');
-  if(coolerSel){
-    coolerSel.innerHTML = '<option value="">(Sin override - Usar original)</option>';
-    if(window.D && window.D.meta && window.D.meta.coolers){
-      Object.keys(window.D.meta.coolers).sort().forEach(function(code){
-        var opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = code + ' — ' + window.D.meta.coolers[code];
-        coolerSel.appendChild(opt);
-      });
-    }
-  }
+  _populateCoolerSelect(coolerSel, true);
 
   var saved = _skuOvStore.get(ovId, sku);
   document.getElementById('sku-ov-modal-cajas').value = saved ? (saved.cajas != null ? saved.cajas : '') : (cajasActuales != null ? cajasActuales : '');
@@ -4056,17 +4046,7 @@ function openAgregarOvManualModal(){
   document.getElementById('add-ov-comentarios').value = '';
 
   var coolerSel = document.getElementById('add-ov-cooler');
-  if(coolerSel){
-    coolerSel.innerHTML = '';
-    if(window.D && window.D.meta && window.D.meta.coolers){
-      Object.keys(window.D.meta.coolers).sort().forEach(function(code){
-        var opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = code + ' — ' + window.D.meta.coolers[code];
-        coolerSel.appendChild(opt);
-      });
-    }
-  }
+  _populateCoolerSelect(coolerSel, false);
 
   overlay.style.display = 'block';
   modal.style.display = 'block';
@@ -4104,7 +4084,7 @@ async function saveManualOV(){
     return;
   }
 
-  var coolerNom = (window.D && window.D.meta && window.D.meta.coolers) ? window.D.meta.coolers[cooler] : '';
+  var coolerNom = _getCoolerNombre(cooler);
 
   var mo = {
     OV: ov,
@@ -4158,17 +4138,7 @@ function openCrearEmbarqueModal(id){
   var defDate = (window.D && window.D.meta && window.D.meta.today) ? window.D.meta.today : new Date().toISOString().slice(0,10);
 
   var coolerSel = document.getElementById('add-emb-cooler');
-  if(coolerSel){
-    coolerSel.innerHTML = '';
-    if(window.D && window.D.meta && window.D.meta.coolers){
-      Object.keys(window.D.meta.coolers).sort().forEach(function(code){
-        var opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = code + ' — ' + window.D.meta.coolers[code];
-        coolerSel.appendChild(opt);
-      });
-    }
-  }
+  _populateCoolerSelect(coolerSel, false);
 
   if(id){
     var e = _embManualShipments.find(function(x){ return x.EmbarqueID === id; });
@@ -4298,7 +4268,7 @@ async function saveManualShipment(){
     });
   }
 
-  var coolerNom = (window.D && window.D.meta && window.D.meta.coolers) ? window.D.meta.coolers[cooler] : '';
+  var coolerNom = _getCoolerNombre(cooler);
 
   var msObj = {
     EmbarqueID: id,
@@ -4313,7 +4283,7 @@ async function saveManualShipment(){
     PctCarga: capacidad > 0 ? (pallets / capacidad * 100) : 0,
     EstadoCarga: cargaSap,
     CoolerSalida: cooler,
-    CoolerSalidaNom: coolerNom || cooler,
+    CoolerSalidaNom: coolerNom,
     Clientes: ovsArr.map(function(o){ return o.cliente; }).filter(Boolean),
     OVsDetalle: ovsArr,
     NroOVsCompletas: ovsArr.filter(function(o){ return o.pct >= 100; }).length,
@@ -4880,7 +4850,9 @@ function _buildShareMsg(id){
   var unidad  = e.Unidad || id;
   var fecha   = e.Fecha || '';
   var destino = e.DestinoNorm || e.Destino || '';
-  var cooler  = e.CoolerSalidaNom || e.CoolerSalida || '';
+  var coolerCode = e.CoolerSalida || '';
+  var coolerNomWA = e.CoolerSalidaNom || _getCoolerNombre(coolerCode) || coolerCode;
+  var coolerDisplay = coolerNomWA && coolerNomWA !== coolerCode ? coolerCode + ' — ' + coolerNomWA : coolerCode;
   var ovsDet  = e.OVsDetalle || [];
   var cajas   = fmt(e.CajasTotal||0);
   var pallets = (e.PalletsAsignados||0).toFixed(1);
@@ -4894,7 +4866,7 @@ function _buildShareMsg(id){
   lines.push(iconT+' *'+unidad+'*');
   if(fecha)   lines.push('📅 Fecha: *'+fecha+'*');
   if(destino) lines.push('📍 Destino: *'+destino+'*');
-  if(cooler)  lines.push('🏭 Cooler salida: *'+cooler+'*');
+  if(coolerDisplay) lines.push('🏭 Cooler salida: *'+coolerDisplay+'*');
   lines.push('📦 Cajas: *'+cajas+'*  |  🏗 Pallets: *'+pallets+'*');
   lines.push(pctIcon+' Cumplimiento global: *'+pctGlobal+'%*');
   lines.push('');
@@ -5938,6 +5910,57 @@ function _aplicarFiltrosYOverridesGlobales() {
   window._seData = window.SE_DATA || [];
 }
 
+
+// ── Mapa global de Coolers (SAP → Nombre) ──────────────────────────────
+// Construido dinámicamente desde plan_dia.lineas que SIEMPRE tiene CoolerNombre
+var _coolersMap = {};
+function _buildCoolersMap(){
+  _coolersMap = {};
+  // Fuente 1: D.meta.coolers (puede ser array o mapa)
+  if(window.D && window.D.meta && window.D.meta.coolers){
+    var c = window.D.meta.coolers;
+    if(Array.isArray(c)){
+      // Es array de códigos SAP — sin nombres
+      c.forEach(function(code){ if(code) _coolersMap[code] = code; });
+    } else if(typeof c === 'object'){
+      // Ya es mapa {código: nombre}
+      Object.keys(c).forEach(function(k){ _coolersMap[k] = c[k] || k; });
+    }
+  }
+  // Fuente 2: plan_dia.lineas — sobrescribe con nombres reales
+  if(window.D && window.D.plan_dia && window.D.plan_dia.lineas){
+    window.D.plan_dia.lineas.forEach(function(l){
+      if(l.Cooler && l.CoolerNombre) _coolersMap[l.Cooler] = l.CoolerNombre;
+      // También de CoolerOpciones
+      if(l.CoolerOpciones){
+        l.CoolerOpciones.forEach(function(o){
+          if(o.sap && o.nombre) _coolersMap[o.sap] = o.nombre;
+        });
+      }
+    });
+  }
+}
+function _getCoolerNombre(code){
+  if(!code) return '';
+  if(_coolersMap[code]) return _coolersMap[code];
+  // Fallback: buscar en D.meta.coolers
+  if(window.D && window.D.meta && window.D.meta.coolers && !Array.isArray(window.D.meta.coolers)){
+    return window.D.meta.coolers[code] || code;
+  }
+  return code;
+}
+function _populateCoolerSelect(selectEl, includeEmpty){
+  if(!selectEl) return;
+  selectEl.innerHTML = includeEmpty ? '<option value="">(Sin override - Usar original)</option>' : '';
+  Object.keys(_coolersMap).sort().forEach(function(code){
+    var opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = code + ' — ' + _coolersMap[code];
+    selectEl.appendChild(opt);
+  });
+}
+// Construir al arrancar
+try{ _buildCoolersMap(); }catch(e){ console.warn('_buildCoolersMap:', e); }
 
 // ── Servidor local de persistencia (bp_servidor.py en puerto 5000)
 var _BP_API = 'http://127.0.0.1:5000';

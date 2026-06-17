@@ -3671,7 +3671,14 @@ function renderEmbarques(){
 
     // Cooler de salida — viene calculado desde actualizador
     var coolerSAP = e.CoolerSalida || '';
-    var coolerNom = e.CoolerSalidaNom || coolerSAP || '';
+    // Resolver numéricos legacy
+    if(coolerSAP && /^\d+$/.test(coolerSAP)){
+      if(window.D && window.D.meta && Array.isArray(window.D.meta.coolers)){
+        var idx = parseInt(coolerSAP);
+        if(idx >= 0 && idx < window.D.meta.coolers.length) coolerSAP = window.D.meta.coolers[idx];
+      }
+    }
+    var coolerNom = e.CoolerSalidaNom || _getCoolerNombre(coolerSAP) || coolerSAP || '';
     var coolerMix = e.CoolerSalidaMix || [];   // solo para aéreos
     var esAereo   = tipo === 'AEREO';
     // Texto principal: SAP + nombre si difiere, o solo SAP
@@ -3882,7 +3889,23 @@ function _buildShareMsg(id){
   var unidad  = e.Unidad || id;
   var fecha   = e.Fecha || '';
   var destino = e.DestinoNorm || e.Destino || '';
-  var cooler  = e.CoolerSalida || e.CoolerSalidaNom || '';
+  var coolerCode = e.CoolerSalida || '';
+  // Resolver numéricos legacy
+  if(coolerCode && /^\d+$/.test(coolerCode)){
+    if(window.D && window.D.meta && Array.isArray(window.D.meta.coolers)){
+      var idx = parseInt(coolerCode);
+      if(idx >= 0 && idx < window.D.meta.coolers.length) coolerCode = window.D.meta.coolers[idx];
+    }
+  }
+  var coolerNomWA = e.CoolerSalidaNom && !/^\d+$/.test(e.CoolerSalidaNom) ? e.CoolerSalidaNom : _getCoolerNombre(coolerCode);
+  var coolerDisplay = '';
+  if(coolerCode && coolerNomWA && coolerNomWA !== coolerCode){
+    coolerDisplay = coolerCode + ' — ' + coolerNomWA;
+  } else if(coolerNomWA){
+    coolerDisplay = coolerNomWA;
+  } else {
+    coolerDisplay = coolerCode;
+  }
   var ovsDet  = e.OVsDetalle || [];
   var cajas   = fmt(e.CajasTotal||0);
   var pallets = (e.PalletsAsignados||0).toFixed(1);
@@ -3896,7 +3919,7 @@ function _buildShareMsg(id){
   lines.push(iconT+' *'+unidad+'*');
   if(fecha)   lines.push('📅 Fecha: *'+fecha+'*');
   if(destino) lines.push('📍 Destino: *'+destino+'*');
-  if(cooler)  lines.push('🏭 Cooler salida: *'+cooler+'*');
+  if(coolerDisplay)  lines.push('🏭 Cooler salida: *'+coolerDisplay+'*');
   lines.push('📦 Cajas: *'+cajas+'*  |  🏗 Pallets: *'+pallets+'*');
   lines.push(pctIcon+' Cumplimiento global: *'+pctGlobal+'%*');
   lines.push('');
@@ -4751,6 +4774,40 @@ function exportCumCSV() {
 // PESTAÑA: SEMÁFORO EMBARQUES
 // ─────────────────────────────────────────
 var _seChartDonut = null;
+
+// ── Mapa global de Coolers (SAP → Nombre) ──────────────────────────────
+var _coolersMap = {};
+function _buildCoolersMap(){
+  _coolersMap = {};
+  if(window.D && window.D.meta && window.D.meta.coolers){
+    var c = window.D.meta.coolers;
+    if(Array.isArray(c)){
+      c.forEach(function(code){ if(code) _coolersMap[code] = code; });
+    } else if(typeof c === 'object'){
+      Object.keys(c).forEach(function(k){ _coolersMap[k] = c[k] || k; });
+    }
+  }
+  if(window.D && window.D.plan_dia && window.D.plan_dia.lineas){
+    window.D.plan_dia.lineas.forEach(function(l){
+      if(l.Cooler && l.CoolerNombre) _coolersMap[l.Cooler] = l.CoolerNombre;
+      if(l.CoolerOpciones){
+        l.CoolerOpciones.forEach(function(o){
+          if(o.sap && o.nombre) _coolersMap[o.sap] = o.nombre;
+        });
+      }
+    });
+  }
+}
+function _getCoolerNombre(code){
+  if(!code) return '';
+  if(_coolersMap[code]) return _coolersMap[code];
+  if(window.D && window.D.meta && window.D.meta.coolers && !Array.isArray(window.D.meta.coolers)){
+    return window.D.meta.coolers[code] || code;
+  }
+  return code;
+}
+try{ _buildCoolersMap(); }catch(e){ console.warn('_buildCoolersMap:', e); }
+
 // Comentarios ROJO por fruto: { 'Arándano': 'texto...', ... }
 var _seComentarios = {};
 var _seOVManual = {};
@@ -5498,6 +5555,7 @@ function eliminarConsolidacion(cid){
 
 // ── Auto-init al cargar (tab activo = Resumen)
 (function(){
+  try{ _buildCoolersMap(); }   catch(e){ console.warn('_buildCoolersMap:', e); }
   try{ initResumen(); }       catch(e){ console.warn('initResumen:', e); }
   try{ initPlanDia(); }       catch(e){ console.warn('initPlanDia:', e); }
   try{ initInv(); }           catch(e){ console.warn('initInv:', e); }

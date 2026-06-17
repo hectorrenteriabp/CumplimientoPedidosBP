@@ -3671,14 +3671,20 @@ function renderEmbarques(){
 
     // Cooler de salida — viene calculado desde actualizador
     var coolerSAP = e.CoolerSalida || '';
-    // Resolver numéricos legacy
+    var coolerNom = e.CoolerSalidaNom || '';
+    // 1. Si el código es numérico pero el nombre es real (ej: "FTAL"), usar el nombre real
+    if(coolerSAP && /^\d+$/.test(coolerSAP) && coolerNom && !/^\d+$/.test(coolerNom)){
+      coolerSAP = coolerNom;
+    }
+    // 2. Si sigue siendo numérico, usar D.meta.coolers como fallback
     if(coolerSAP && /^\d+$/.test(coolerSAP)){
       if(window.D && window.D.meta && Array.isArray(window.D.meta.coolers)){
         var idx = parseInt(coolerSAP);
         if(idx >= 0 && idx < window.D.meta.coolers.length) coolerSAP = window.D.meta.coolers[idx];
       }
     }
-    var coolerNom = e.CoolerSalidaNom || _getCoolerNombre(coolerSAP) || coolerSAP || '';
+    // Resolver el nombre final
+    coolerNom = coolerNom && !/^\d+$/.test(coolerNom) ? coolerNom : (_getCoolerNombre(coolerSAP) || coolerSAP || '');
     var coolerMix = e.CoolerSalidaMix || [];   // solo para aéreos
     var esAereo   = tipo === 'AEREO';
     // Texto principal: SAP + nombre si difiere, o solo SAP
@@ -3890,14 +3896,19 @@ function _buildShareMsg(id){
   var fecha   = e.Fecha || '';
   var destino = e.DestinoNorm || e.Destino || '';
   var coolerCode = e.CoolerSalida || '';
-  // Resolver numéricos legacy
+  var coolerNom = e.CoolerSalidaNom || '';
+  // 1. Si el código es numérico pero el nombre es real (ej: "FTAL"), usar el nombre real
+  if(coolerCode && /^\d+$/.test(coolerCode) && coolerNom && !/^\d+$/.test(coolerNom)){
+    coolerCode = coolerNom;
+  }
+  // 2. Si sigue siendo numérico, usar D.meta.coolers como fallback
   if(coolerCode && /^\d+$/.test(coolerCode)){
     if(window.D && window.D.meta && Array.isArray(window.D.meta.coolers)){
       var idx = parseInt(coolerCode);
       if(idx >= 0 && idx < window.D.meta.coolers.length) coolerCode = window.D.meta.coolers[idx];
     }
   }
-  var coolerNomWA = e.CoolerSalidaNom && !/^\d+$/.test(e.CoolerSalidaNom) ? e.CoolerSalidaNom : _getCoolerNombre(coolerCode);
+  var coolerNomWA = coolerNom && !/^\d+$/.test(coolerNom) ? coolerNom : _getCoolerNombre(coolerCode);
   var coolerDisplay = '';
   if(coolerCode && coolerNomWA && coolerNomWA !== coolerCode){
     coolerDisplay = coolerCode + ' — ' + coolerNomWA;

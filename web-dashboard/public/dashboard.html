@@ -4638,7 +4638,17 @@ function renderEmbarques(){
 
     // Cooler de salida — viene calculado desde actualizador
     var coolerSAP = e.CoolerSalida || '';
-    var coolerNom = e.CoolerSalidaNom || coolerSAP || '';
+    // Resolver nombre dinámicamente (para datos viejos y nuevos)
+    var coolerNom = e.CoolerSalidaNom || _getCoolerNombre(coolerSAP) || coolerSAP || '';
+    // Si coolerSAP es numérico (bug viejo), intentar resolverlo
+    if(coolerSAP && /^\d+$/.test(coolerSAP)){
+      var keys = Object.keys(_coolersMap).sort();
+      var idx = parseInt(coolerSAP);
+      if(idx >= 0 && idx < keys.length){
+        coolerSAP = keys[idx];
+        coolerNom = _coolersMap[coolerSAP];
+      }
+    }
     var coolerMix = e.CoolerSalidaMix || [];   // solo para aéreos
     var esAereo   = tipo === 'AEREO';
     // Texto principal: SAP + nombre si difiere, o solo SAP
@@ -4851,8 +4861,21 @@ function _buildShareMsg(id){
   var fecha   = e.Fecha || '';
   var destino = e.DestinoNorm || e.Destino || '';
   var coolerCode = e.CoolerSalida || '';
-  var coolerNomWA = e.CoolerSalidaNom || _getCoolerNombre(coolerCode) || coolerCode;
-  var coolerDisplay = coolerNomWA && coolerNomWA !== coolerCode ? coolerCode + ' — ' + coolerNomWA : coolerCode;
+  // Resolver numéricos legacy
+  if(coolerCode && /^\d+$/.test(coolerCode)){
+    var keys = Object.keys(_coolersMap).sort();
+    var idx = parseInt(coolerCode);
+    if(idx >= 0 && idx < keys.length) coolerCode = keys[idx];
+  }
+  var coolerNomWA = e.CoolerSalidaNom && !/^\d+$/.test(e.CoolerSalidaNom) ? e.CoolerSalidaNom : _getCoolerNombre(coolerCode);
+  var coolerDisplay = '';
+  if(coolerCode && coolerNomWA && coolerNomWA !== coolerCode){
+    coolerDisplay = coolerCode + ' — ' + coolerNomWA;
+  } else if(coolerNomWA){
+    coolerDisplay = coolerNomWA;
+  } else {
+    coolerDisplay = coolerCode;
+  }
   var ovsDet  = e.OVsDetalle || [];
   var cajas   = fmt(e.CajasTotal||0);
   var pallets = (e.PalletsAsignados||0).toFixed(1);
@@ -6075,6 +6098,34 @@ async function _cargarDatosPersistentesFallback(){
     _embManualDesp      = (rcons||{}).manual_desp||{};
     _embOvsAgregadas    = (rcons||{}).ovs_agregadas||{};
     _embManualShipments = (rcons||{}).manual_shipments||[];
+    // ── Migración: corregir coolers numéricos guardados por bug anterior ──
+    _embManualShipments.forEach(function(ms){
+      if(ms.CoolerSalida && /^\d+$/.test(ms.CoolerSalida)){
+        // CoolerSalida es un índice numérico ("0","1","2"...) del bug anterior
+        // Intentar resolverlo como índice del array D.meta.coolers
+        if(window.D && window.D.meta && Array.isArray(window.D.meta.coolers)){
+          var idx = parseInt(ms.CoolerSalida);
+          if(idx >= 0 && idx < window.D.meta.coolers.length){
+            ms.CoolerSalida = window.D.meta.coolers[idx];
+            ms.CoolerSalidaNom = _getCoolerNombre(ms.CoolerSalida);
+          }
+        }
+        // Si sigue siendo numérico, intentar usando _coolersMap
+        if(/^\d+$/.test(ms.CoolerSalida)){
+          var keys = Object.keys(_coolersMap).sort();
+          var idx2 = parseInt(ms.CoolerSalida);
+          if(idx2 >= 0 && idx2 < keys.length){
+            ms.CoolerSalida = keys[idx2];
+            ms.CoolerSalidaNom = _coolersMap[keys[idx2]];
+          }
+        }
+      }
+      // Siempre recalcular el nombre si es vacío o igual al código
+      if(ms.CoolerSalida && (!ms.CoolerSalidaNom || ms.CoolerSalidaNom === ms.CoolerSalida)){
+        var resolved = _getCoolerNombre(ms.CoolerSalida);
+        if(resolved && resolved !== ms.CoolerSalida) ms.CoolerSalidaNom = resolved;
+      }
+    });
     _addedOvs           = radded || [];
     if (!_addedOvs.length) {
       try { _addedOvs = JSON.parse(localStorage.getItem('bp_added_ovs.json') || '[]'); } catch(e){}

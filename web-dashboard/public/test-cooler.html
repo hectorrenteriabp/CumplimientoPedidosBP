@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Test: Cooler Name Resolution</title>
+<title>Test: Cooler Name en WhatsApp - Datos Legacy</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Inter',sans-serif; background:#0a1a0d; color:#e0e0e0; padding:20px; }
-  h1 { color:#4CAF50; margin-bottom:12px; font-size:22px; }
+  h1 { color:#4CAF50; margin-bottom:8px; font-size:22px; }
   h2 { color:#81C784; margin:20px 0 10px; font-size:16px; }
+  .subtitle { color:#999; margin-bottom:20px; font-size:13px; }
   .test { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:16px; margin:10px 0; }
   .pass { border-left:4px solid #4CAF50; }
   .fail { border-left:4px solid #EF4444; }
@@ -19,238 +20,181 @@
   pre { background:rgba(0,0,0,.3); padding:10px; border-radius:8px; font-size:11px; overflow-x:auto; margin:8px 0; }
   .summary { background:rgba(76,175,80,.1); border:1px solid rgba(76,175,80,.3); border-radius:12px; padding:20px; margin:20px 0; text-align:center; }
   .summary.fail-summary { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); }
-  .btn { background:#4CAF50; color:#fff; border:none; border-radius:8px; padding:10px 20px; cursor:pointer; font-size:14px; font-weight:700; margin:10px 5px; }
-  .btn:hover { background:#388E3C; }
-  #whatsapp-preview { background:rgba(0,0,0,.3); border-radius:12px; padding:16px; margin:10px 0; white-space:pre-wrap; font-family:monospace; font-size:13px; line-height:1.6; }
+  .wa-preview { background:#1a2c1e; border:1px solid rgba(76,175,80,.3); border-radius:12px; padding:16px; margin:10px 0; white-space:pre-wrap; font-family:monospace; font-size:13px; line-height:1.6; }
+  .wa-label { font-size:11px; color:#999; margin-bottom:6px; display:flex; gap:8px; align-items:center; }
+  .wa-label span { background:rgba(239,68,68,.15); color:#EF4444; padding:2px 8px; border-radius:4px; font-weight:700; }
+  .wa-label .fixed { background:rgba(76,175,80,.15); color:#4CAF50; }
+  .compare { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0; }
+  @media(max-width:700px){ .compare{grid-template-columns:1fr;} }
 </style>
 </head>
 <body>
 
-<h1>🧪 Test: Resolución de Nombre de Cooler en Embarques</h1>
-<p style="color:#999;margin-bottom:20px">Esta prueba verifica que al crear un embarque manual, el cooler muestre el NOMBRE (ej. "Tala") en vez del NÚMERO/CÓDIGO (ej. "6" o "FTAL").</p>
+<h1>🧪 Test: Cooler Name en WhatsApp — Datos Legacy vs Nuevos</h1>
+<p class="subtitle">Verifica que los embarques manuales creados ANTES del fix (con CoolerSalida="1") se resuelven correctamente al compartir por WhatsApp.</p>
 
 <div id="results"></div>
 <div id="whatsapp-section"></div>
 
 <script>
-// ══════════════════════════════════════════════════════════════════
-// SIMULAR los datos D tal como los genera el Python (bp_data.js)
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// SIMULAR D.meta.coolers como ARRAY (lo que genera Python)
+// ══════════════════════════════════════════════════════
 window.D = {
   meta: {
     today: "2026-06-17",
-    // CASO REAL: Python genera esto como ARRAY de códigos SAP
     coolers: ["FABS", "FTUX", "FSAY", "FREY", "FPER", "FQUI", "FTAL", "FTAC", "FQUE", "FIXT", "FPAZ"],
-    actualizado: "2026-06-17 09:00",
     version: "4.2"
   },
   plan_dia: {
     lineas: [
-      { OV: "47730", Cooler: "FTAL", CoolerNombre: "Tala", CoolerOpciones: [
-        {sap: "FTAL", nombre: "Tala", inv: 500},
-        {sap: "FREY", nombre: "Los Reyes", inv: 300}
-      ]},
-      { OV: "47732", Cooler: "FREY", CoolerNombre: "Los Reyes", CoolerOpciones: [
-        {sap: "FREY", nombre: "Los Reyes", inv: 200},
-        {sap: "FPER", nombre: "Periban", inv: 150},
-        {sap: "FSAY", nombre: "Sayula", inv: 100}
-      ]},
-      { OV: "47733", Cooler: "FTAC", CoolerNombre: "Tacambaro", CoolerOpciones: [
-        {sap: "FTAC", nombre: "Tacambaro", inv: 800},
-        {sap: "FTUX", nombre: "Tuxpan", inv: 600},
-        {sap: "FQUI", nombre: "Quila", inv: 400},
-        {sap: "FQUE", nombre: "Queseria", inv: 200}
-      ]},
-      { OV: "47734", Cooler: "FABS", CoolerNombre: "Abasolo", CoolerOpciones: [] },
-      { OV: "47735", Cooler: "FIXT", CoolerNombre: "Ixtlan", CoolerOpciones: [] },
-      { OV: "47736", Cooler: "FPAZ", CoolerNombre: "La Paz", CoolerOpciones: [] }
+      { OV:"47730", Cooler:"FTAL", CoolerNombre:"Tala", CoolerOpciones:[{sap:"FREY",nombre:"Los Reyes",inv:300},{sap:"FPER",nombre:"Periban",inv:150}] },
+      { OV:"47732", Cooler:"FREY", CoolerNombre:"Los Reyes", CoolerOpciones:[{sap:"FSAY",nombre:"Sayula",inv:100}] },
+      { OV:"47733", Cooler:"FTAC", CoolerNombre:"Tacambaro", CoolerOpciones:[{sap:"FTUX",nombre:"Tuxpan",inv:600},{sap:"FQUI",nombre:"Quila",inv:400},{sap:"FQUE",nombre:"Queseria",inv:200}] },
+      { OV:"47734", Cooler:"FABS", CoolerNombre:"Abasolo", CoolerOpciones:[] },
+      { OV:"47735", Cooler:"FIXT", CoolerNombre:"Ixtlan", CoolerOpciones:[] },
+      { OV:"47736", Cooler:"FPAZ", CoolerNombre:"La Paz", CoolerOpciones:[] }
     ]
   }
 };
 
-// ══════════════════════════════════════════════════════════════════
-// COPIAR las funciones corregidas del dashboard
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// Funciones del dashboard (copiadas)
+// ══════════════════════════════════════════════════════
 var _coolersMap = {};
 function _buildCoolersMap(){
   _coolersMap = {};
   if(window.D && window.D.meta && window.D.meta.coolers){
     var c = window.D.meta.coolers;
-    if(Array.isArray(c)){
-      c.forEach(function(code){ if(code) _coolersMap[code] = code; });
-    } else if(typeof c === 'object'){
-      Object.keys(c).forEach(function(k){ _coolersMap[k] = c[k] || k; });
-    }
+    if(Array.isArray(c)) c.forEach(function(code){ if(code) _coolersMap[code] = code; });
+    else if(typeof c === 'object') Object.keys(c).forEach(function(k){ _coolersMap[k] = c[k] || k; });
   }
   if(window.D && window.D.plan_dia && window.D.plan_dia.lineas){
     window.D.plan_dia.lineas.forEach(function(l){
       if(l.Cooler && l.CoolerNombre) _coolersMap[l.Cooler] = l.CoolerNombre;
-      if(l.CoolerOpciones){
-        l.CoolerOpciones.forEach(function(o){
-          if(o.sap && o.nombre) _coolersMap[o.sap] = o.nombre;
-        });
-      }
+      if(l.CoolerOpciones) l.CoolerOpciones.forEach(function(o){
+        if(o.sap && o.nombre) _coolersMap[o.sap] = o.nombre;
+      });
     });
   }
 }
 function _getCoolerNombre(code){
   if(!code) return '';
   if(_coolersMap[code]) return _coolersMap[code];
-  if(window.D && window.D.meta && window.D.meta.coolers && !Array.isArray(window.D.meta.coolers)){
-    return window.D.meta.coolers[code] || code;
-  }
   return code;
 }
-
-// Build the map
 _buildCoolersMap();
 
-// ══════════════════════════════════════════════════════════════════
-// RUN TESTS
-// ══════════════════════════════════════════════════════════════════
-var results = [];
+// ══════════════════════════════════════════════════════
+// Simular embarques manuales con datos LEGACY (bug viejo)
+// ══════════════════════════════════════════════════════
+var _embManualShipments = [
+  { EmbarqueID:"EMBARQUE COSTCO", CoolerSalida:"1", CoolerSalidaNom:"1", Fecha:"2026-06-16", DestinoNorm:"MEXICO, DF", CajasTotal:800, PalletsAsignados:11 },
+  { EmbarqueID:"EMBARQUE ALSEA", CoolerSalida:"6", CoolerSalidaNom:"6", Fecha:"2026-06-16", DestinoNorm:"MEXICO, DF", CajasTotal:260, PalletsAsignados:2 },
+  { EmbarqueID:"EMBARQUE NORMAL", CoolerSalida:"FREY", CoolerSalidaNom:"Los Reyes", Fecha:"2026-06-17", DestinoNorm:"MCALLEN", CajasTotal:1200, PalletsAsignados:5 },
+  { EmbarqueID:"EMBARQUE NUEVO", CoolerSalida:"FTAC", CoolerSalidaNom:"Tacambaro", Fecha:"2026-06-17", DestinoNorm:"SAMS", CajasTotal:500, PalletsAsignados:3 }
+];
 
-function test(name, actual, expected) {
-  var pass = actual === expected;
-  results.push({ name, actual, expected, pass });
+// ══════════════════════════════════════════════════════
+// EJECUTAR MIGRACIÓN (igual que en el dashboard)
+// ══════════════════════════════════════════════════════
+_embManualShipments.forEach(function(ms){
+  if(ms.CoolerSalida && /^\d+$/.test(ms.CoolerSalida)){
+    if(window.D && window.D.meta && Array.isArray(window.D.meta.coolers)){
+      var idx = parseInt(ms.CoolerSalida);
+      if(idx >= 0 && idx < window.D.meta.coolers.length){
+        ms.CoolerSalida = window.D.meta.coolers[idx];
+        ms.CoolerSalidaNom = _getCoolerNombre(ms.CoolerSalida);
+      }
+    }
+    if(/^\d+$/.test(ms.CoolerSalida)){
+      var keys = Object.keys(_coolersMap).sort();
+      var idx2 = parseInt(ms.CoolerSalida);
+      if(idx2 >= 0 && idx2 < keys.length){
+        ms.CoolerSalida = keys[idx2];
+        ms.CoolerSalidaNom = _coolersMap[keys[idx2]];
+      }
+    }
+  }
+  if(ms.CoolerSalida && (!ms.CoolerSalidaNom || ms.CoolerSalidaNom === ms.CoolerSalida)){
+    var resolved = _getCoolerNombre(ms.CoolerSalida);
+    if(resolved && resolved !== ms.CoolerSalida) ms.CoolerSalidaNom = resolved;
+  }
+});
+
+// ══════════════════════════════════════════════════════
+// Función WhatsApp (igual que en el dashboard)
+// ══════════════════════════════════════════════════════
+function generateWhatsAppText(e){
+  var coolerCode = e.CoolerSalida || '';
+  if(coolerCode && /^\d+$/.test(coolerCode)){
+    var keys = Object.keys(_coolersMap).sort();
+    var idx = parseInt(coolerCode);
+    if(idx >= 0 && idx < keys.length) coolerCode = keys[idx];
+  }
+  var coolerNomWA = e.CoolerSalidaNom && !/^\d+$/.test(e.CoolerSalidaNom) ? e.CoolerSalidaNom : _getCoolerNombre(coolerCode);
+  var coolerDisplay = '';
+  if(coolerCode && coolerNomWA && coolerNomWA !== coolerCode){
+    coolerDisplay = coolerCode + ' — ' + coolerNomWA;
+  } else if(coolerNomWA){
+    coolerDisplay = coolerNomWA;
+  } else {
+    coolerDisplay = coolerCode;
+  }
+  return {
+    coolerCode: coolerCode,
+    coolerNom: coolerNomWA,
+    coolerDisplay: coolerDisplay,
+    text: '🍓 *BERRIES PARADISE — EMBARQUE*\n━━━━━━━━━━━━━━━━━━━━━━━━\n🚛 *' + e.EmbarqueID + '*\n📅 Fecha: *' + e.Fecha + '*\n📍 Destino: *' + e.DestinoNorm + '*\n🏭 Cooler salida: *' + coolerDisplay + '*\n📦 Cajas: *' + e.CajasTotal + '*  |  🏗 Pallets: *' + (e.PalletsAsignados||0).toFixed(1) + '*'
+  };
 }
 
-// Test 1: _coolersMap fue construido correctamente
-test(
-  'FTAL resuelve a "Tala" (no a "FTAL" ni a undefined)',
-  _getCoolerNombre('FTAL'),
-  'Tala'
-);
+// ══════════════════════════════════════════════════════
+// TESTS
+// ══════════════════════════════════════════════════════
+var results = [];
+function test(name, actual, expected){
+  results.push({ name:name, actual:actual, expected:expected, pass:actual===expected });
+}
 
-test(
-  'FREY resuelve a "Los Reyes"',
-  _getCoolerNombre('FREY'),
-  'Los Reyes'
-);
+// Test migración de datos
+var costco = _embManualShipments[0];
+test('Migración: COSTCO CoolerSalida "1" → "FTUX" (índice 1 del array)', costco.CoolerSalida, 'FTUX');
+test('Migración: COSTCO CoolerSalidaNom → "Tuxpan"', costco.CoolerSalidaNom, 'Tuxpan');
 
-test(
-  'FTAC resuelve a "Tacambaro"',
-  _getCoolerNombre('FTAC'),
-  'Tacambaro'
-);
+var alsea = _embManualShipments[1];
+test('Migración: ALSEA CoolerSalida "6" → "FTAL" (índice 6 del array)', alsea.CoolerSalida, 'FTAL');
+test('Migración: ALSEA CoolerSalidaNom → "Tala"', alsea.CoolerSalidaNom, 'Tala');
 
-test(
-  'FPER resuelve a "Periban" (viene de CoolerOpciones)',
-  _getCoolerNombre('FPER'),
-  'Periban'
-);
+var normal = _embManualShipments[2];
+test('Sin cambio: NORMAL CoolerSalida sigue "FREY"', normal.CoolerSalida, 'FREY');
+test('Sin cambio: NORMAL CoolerSalidaNom sigue "Los Reyes"', normal.CoolerSalidaNom, 'Los Reyes');
 
-test(
-  'FSAY resuelve a "Sayula" (viene de CoolerOpciones)',
-  _getCoolerNombre('FSAY'),
-  'Sayula'
-);
+var nuevo = _embManualShipments[3];
+test('Sin cambio: NUEVO CoolerSalida sigue "FTAC"', nuevo.CoolerSalida, 'FTAC');
+test('Sin cambio: NUEVO CoolerSalidaNom sigue "Tacambaro"', nuevo.CoolerSalidaNom, 'Tacambaro');
 
-test(
-  'FABS resuelve a "Abasolo"',
-  _getCoolerNombre('FABS'),
-  'Abasolo'
-);
+// Test WhatsApp texts
+var waCostco = generateWhatsAppText(costco);
+test('WhatsApp COSTCO: coolerDisplay = "FTUX — Tuxpan"', waCostco.coolerDisplay, 'FTUX — Tuxpan');
 
-test(
-  'FTUX resuelve a "Tuxpan"',
-  _getCoolerNombre('FTUX'),
-  'Tuxpan'
-);
+var waAlsea = generateWhatsAppText(alsea);
+test('WhatsApp ALSEA: coolerDisplay = "FTAL — Tala"', waAlsea.coolerDisplay, 'FTAL — Tala');
 
-test(
-  'FQUI resuelve a "Quila"',
-  _getCoolerNombre('FQUI'),
-  'Quila'
-);
+var waNormal = generateWhatsAppText(normal);
+test('WhatsApp NORMAL: coolerDisplay = "FREY — Los Reyes"', waNormal.coolerDisplay, 'FREY — Los Reyes');
 
-test(
-  'FQUE resuelve a "Queseria"',
-  _getCoolerNombre('FQUE'),
-  'Queseria'
-);
-
-test(
-  'FIXT resuelve a "Ixtlan"',
-  _getCoolerNombre('FIXT'),
-  'Ixtlan'
-);
-
-test(
-  'FPAZ resuelve a "La Paz"',
-  _getCoolerNombre('FPAZ'),
-  'La Paz'
-);
-
-test(
-  'Código vacío retorna ""',
-  _getCoolerNombre(''),
-  ''
-);
-
-// Test: Simular lo que hace saveManualShipment
-var testCoolerCode = 'FTAL';
-var coolerNom = _getCoolerNombre(testCoolerCode);
-test(
-  'saveManualShipment: CoolerSalidaNom para "FTAL" = "Tala"',
-  coolerNom,
-  'Tala'
-);
-
-// Test: Verificar el mapa completo tiene todos los coolers
-var mapKeys = Object.keys(_coolersMap).sort();
-test(
-  '_coolersMap tiene 11 coolers',
-  mapKeys.length.toString(),
-  '11'
-);
-
-// Test: Simular texto WhatsApp
-var e = {
-  CoolerSalida: 'FTAL',
-  CoolerSalidaNom: 'Tala',
-  Unidad: 'EMBARQUE COSTCO',
-  Fecha: '2026-06-17',
-  DestinoNorm: 'MEXICO, DF',
-  CajasTotal: 800,
-  PalletsAsignados: 11,
-  OVsDetalle: [{ ov: '47732', pedido: 800, cajas: 600, stock: 600 }]
-};
-var coolerCode = e.CoolerSalida || '';
-var coolerNomWA = e.CoolerSalidaNom || _getCoolerNombre(coolerCode) || coolerCode;
-var coolerDisplay = coolerNomWA && coolerNomWA !== coolerCode ? coolerCode + ' — ' + coolerNomWA : coolerCode;
-
-test(
-  'WhatsApp: Cooler display = "FTAL — Tala"',
-  coolerDisplay,
-  'FTAL — Tala'
-);
-
-// Test con embarque que solo tiene CoolerSalida (sin CoolerSalidaNom)
-var e2 = { CoolerSalida: 'FREY', CoolerSalidaNom: '' };
-var coolerCode2 = e2.CoolerSalida || '';
-var coolerNomWA2 = e2.CoolerSalidaNom || _getCoolerNombre(coolerCode2) || coolerCode2;
-var coolerDisplay2 = coolerNomWA2 && coolerNomWA2 !== coolerCode2 ? coolerCode2 + ' — ' + coolerNomWA2 : coolerCode2;
-test(
-  'WhatsApp fallback: sin CoolerSalidaNom, FREY → "FREY — Los Reyes"',
-  coolerDisplay2,
-  'FREY — Los Reyes'
-);
-
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
 // RENDER
-// ══════════════════════════════════════════════════════════════════
-var html = '';
-var passCount = 0;
-var failCount = 0;
-
+// ══════════════════════════════════════════════════════
+var html = '<h2>📊 Resultados de Tests</h2>';
+var passCount = 0, failCount = 0;
 results.forEach(function(r){
   if(r.pass) passCount++; else failCount++;
   html += '<div class="test '+(r.pass?'pass':'fail')+'">'
     + '<div class="label">'+r.name+'</div>'
     + '<div class="value '+(r.pass?'green':'red')+'">'
-    + (r.pass ? '✅ PASS' : '❌ FAIL')
-    + ' → '+(r.pass ? r.actual : 'Esperado: "'+r.expected+'" | Obtenido: "'+r.actual+'"')
+    + (r.pass ? '✅ PASS → '+r.actual : '❌ FAIL → Esperado: "'+r.expected+'" | Obtenido: "'+r.actual+'"')
     + '</div></div>';
 });
 
@@ -263,31 +207,52 @@ html += '<div class="summary '+(allPass?'':'fail-summary')+'">'
   + '<div style="font-size:14px;color:#999;margin-top:8px">'+passCount+' pasaron / '+failCount+' fallaron de '+results.length+' total</div>'
   + '</div>';
 
-html += '<h2>📋 Mapa de Coolers Construido</h2>';
-html += '<pre>';
-Object.keys(_coolersMap).sort().forEach(function(k){
-  html += k + ' → ' + _coolersMap[k] + '\n';
-});
-html += '</pre>';
-
-html += '<h2>📊 Datos Originales de D.meta.coolers (tipo: '+typeof window.D.meta.coolers+')</h2>';
-html += '<pre>'+JSON.stringify(window.D.meta.coolers, null, 2)+'</pre>';
-
 document.getElementById('results').innerHTML = html;
 
 // WhatsApp preview
-var waHtml = '<h2>📱 Preview del texto WhatsApp generado</h2>';
-var lines = [];
-lines.push('🍓 *BERRIES PARADISE — EMBARQUE*');
-lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
-lines.push('🚛 *EMBARQUE COSTCO*');
-lines.push('📅 Fecha: *2026-06-17*');
-lines.push('📍 Destino: *MEXICO, DF*');
-lines.push('🏭 Cooler salida: *'+coolerDisplay+'*');
-lines.push('📦 Cajas: *800*  |  🏗 Pallets: *11.0*');
-lines.push('🟡 Cumplimiento global: *75%*');
-waHtml += '<div id="whatsapp-preview">'+lines.join('\n')+'</div>';
-waHtml += '<p style="color:#4CAF50;font-weight:700;margin-top:10px">✅ Antes: "Cooler salida: 1" → Ahora: "Cooler salida: FTAL — Tala"</p>';
+var waHtml = '<h2>📱 Comparación Antes vs Después — WhatsApp</h2>';
+
+// EMBARQUE COSTCO
+waHtml += '<h2 style="margin-top:24px">EMBARQUE COSTCO (CoolerSalida original: "1")</h2>';
+waHtml += '<div class="compare">';
+waHtml += '<div><div class="wa-label"><span>❌ ANTES (bug)</span></div><div class="wa-preview">'
+  + '🍓 *BERRIES PARADISE — EMBARQUE*\n━━━━━━━━━━━━━━━━━━━━━━━━\n🚛 *EMBARQUE COSTCO*\n📅 Fecha: *2026-06-16*\n📍 Destino: *MEXICO, DF*\n🏭 Cooler salida: *1*\n📦 Cajas: *800*  |  🏗 Pallets: *11.0*'
+  + '</div></div>';
+waHtml += '<div><div class="wa-label"><span class="fixed">✅ AHORA (corregido)</span></div><div class="wa-preview">'
+  + waCostco.text + '</div></div>';
+waHtml += '</div>';
+
+// EMBARQUE ALSEA
+waHtml += '<h2 style="margin-top:24px">EMBARQUE ALSEA (CoolerSalida original: "6")</h2>';
+waHtml += '<div class="compare">';
+waHtml += '<div><div class="wa-label"><span>❌ ANTES (bug)</span></div><div class="wa-preview">'
+  + '🍓 *BERRIES PARADISE — EMBARQUE*\n━━━━━━━━━━━━━━━━━━━━━━━━\n🚛 *EMBARQUE ALSEA*\n📅 Fecha: *2026-06-16*\n📍 Destino: *MEXICO, DF*\n🏭 Cooler salida: *6*\n📦 Cajas: *260*  |  🏗 Pallets: *2.0*'
+  + '</div></div>';
+waHtml += '<div><div class="wa-label"><span class="fixed">✅ AHORA (corregido)</span></div><div class="wa-preview">'
+  + waAlsea.text + '</div></div>';
+waHtml += '</div>';
+
+// EMBARQUE NORMAL
+waHtml += '<h2 style="margin-top:24px">EMBARQUE NORMAL (CoolerSalida: "FREY" — ya estaba bien)</h2>';
+waHtml += '<div class="compare">';
+waHtml += '<div><div class="wa-label"><span class="fixed">✅ Antes</span></div><div class="wa-preview">'
+  + '🍓 *BERRIES PARADISE — EMBARQUE*\n━━━━━━━━━━━━━━━━━━━━━━━━\n🚛 *EMBARQUE NORMAL*\n📅 Fecha: *2026-06-17*\n📍 Destino: *MCALLEN*\n🏭 Cooler salida: *FREY*\n📦 Cajas: *1200*  |  🏗 Pallets: *5.0*'
+  + '</div></div>';
+waHtml += '<div><div class="wa-label"><span class="fixed">✅ Ahora</span></div><div class="wa-preview">'
+  + waNormal.text + '</div></div>';
+waHtml += '</div>';
+
+waHtml += '<h2>📋 Mapa de Coolers</h2><pre>';
+Object.keys(_coolersMap).sort().forEach(function(k){
+  waHtml += k + ' → ' + _coolersMap[k] + '\n';
+});
+waHtml += '</pre>';
+
+waHtml += '<h2>📊 D.meta.coolers original (Array)</h2><pre>';
+window.D.meta.coolers.forEach(function(c,i){
+  waHtml += '['+i+'] = "'+c+'"  ← lo que se guardaba como CoolerSalida con el bug\n';
+});
+waHtml += '</pre>';
 
 document.getElementById('whatsapp-section').innerHTML = waHtml;
 </script>

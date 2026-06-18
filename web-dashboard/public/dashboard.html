@@ -5940,6 +5940,7 @@ function _aplicarFiltrosYOverridesGlobales() {
   }
   
   window._seData = window.SE_DATA || [];
+  try { _buildCoolersMap(); } catch(e) {}
 }
 
 
@@ -5974,6 +5975,10 @@ function _buildCoolersMap(){
 }
 function _getCoolerNombre(code){
   if(!code) return '';
+  // Si el mapa está vacío, intentar reconstruirlo
+  if(Object.keys(_coolersMap).length === 0){
+    try { _buildCoolersMap(); } catch(e) {}
+  }
   if(_coolersMap[code]) return _coolersMap[code];
   // Fallback: buscar en D.meta.coolers
   if(window.D && window.D.meta && window.D.meta.coolers && !Array.isArray(window.D.meta.coolers)){
@@ -5983,6 +5988,9 @@ function _getCoolerNombre(code){
 }
 function _populateCoolerSelect(selectEl, includeEmpty){
   if(!selectEl) return;
+  // Reconstruir dinámicamente el mapa para asegurar que capturamos datos cargados asíncronamente
+  try { _buildCoolersMap(); } catch(e) {}
+  
   selectEl.innerHTML = includeEmpty ? '<option value="">(Sin override - Usar original)</option>' : '';
   Object.keys(_coolersMap).sort().forEach(function(code){
     var opt = document.createElement('option');

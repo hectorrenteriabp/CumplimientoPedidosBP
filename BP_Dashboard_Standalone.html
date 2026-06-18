@@ -4811,6 +4811,10 @@ function _buildCoolersMap(){
 }
 function _getCoolerNombre(code){
   if(!code) return '';
+  // Si el mapa está vacío, intentar reconstruirlo
+  if(Object.keys(_coolersMap).length === 0){
+    try { _buildCoolersMap(); } catch(e) {}
+  }
   if(_coolersMap[code]) return _coolersMap[code];
   if(window.D && window.D.meta && window.D.meta.coolers && !Array.isArray(window.D.meta.coolers)){
     return window.D.meta.coolers[code] || code;

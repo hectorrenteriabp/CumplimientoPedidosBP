@@ -3577,12 +3577,11 @@ var _trlFiltradas = [];
 var _trlIniciado = false;
 
 var NIVEL_BADGE = {
-  // Valores nuevos (cercanía como nivel — desde embarques del día)
   'Cercano 1':  {label:'🟢 Cercano 1',  bg:'#1B5E20', fg:'#fff'},
   'Cercano 2':  {label:'🟡 Cercano 2',  bg:'#F57F17', fg:'#000'},
   'Cercano 3':  {label:'🟠 Cercano 3',  bg:'#E65100', fg:'#fff'},
   'Lejano':     {label:'🔴 Lejano',     bg:'#B71C1C', fg:'#fff'},
-  // Valores legacy (compatibilidad si se mezclan datos)
+  'En Proceso': {label:'🔵 En Proceso', bg:'#1E3A8A', fg:'#fff'},
   'EN_SALIDA':   {label:'✅ En Salida',  bg:'#1B5E20', fg:'#fff'},
   'CERCANO':     {label:'🟡 Cercano',    bg:'#F57F17', fg:'#000'},
   'OTRO_COOLER': {label:'🟠 Otro Cooler',bg:'#E65100', fg:'#fff'},
@@ -3590,11 +3589,64 @@ var NIVEL_BADGE = {
 var PRIO_BG = {1:'rgba(185,28,28,.07)', 2:'rgba(180,100,0,.07)', 3:'rgba(27,94,32,.06)'};
 
 function initTraslados() {
-  var td = (D.traslados && D.traslados.lineas) ? D.traslados.lineas : [];
-  // Excluir líneas SIN_STOCK — esas viven en pestaña Fruta Disponible
+  var td = (D.traslados && D.traslados.lineas) ? D.traslados.lineas : Array.isArray(D.traslados) ? D.traslados : [];
   _trlLineas = td.filter(function(t){ return t.nivel !== 'SIN_STOCK'; });
+
+  // ── Añadir Traslados en Proceso por déficit de OVs ──
+  if (window.D && window.D.plan_dia && Array.isArray(window.D.plan_dia.lineas)) {
+    window.D.plan_dia.lineas.forEach(function(r) {
+      var pedido = r.Pedido || 0;
+      var stock = r.Stock || 0;
+      var deficit = pedido - stock;
+      if (deficit > 0) {
+        // Encontrar si este traslado ya está cubierto por un traslado automático en _trlLineas
+        var cubierto = _trlLineas.reduce(function(acc, t) {
+          if (String(t.ov) === String(r.OV) && String(t.sku) === String(r.SKU)) {
+            return acc + (t.cajas || 0);
+          }
+          return acc;
+        }, 0);
+
+        var deltaPendiente = deficit - cubierto;
+        if (deltaPendiente > 0) {
+          // Determinar cooler destino
+          var destCooler = r.Cooler || 'FTAL';
+          
+          // Buscar si hay stock disponible libre (no asignado) en otros coolers para este SKU
+          var origenSugerido = 'SIN STOCK (Por recibir)';
+          if (window.D && Array.isArray(window.D.inventario)) {
+            var stockLibre = window.D.inventario.filter(function(inv) {
+              return inv.sku === r.SKU && inv.cooler !== destCooler && inv.cajas > 0;
+            });
+            if (stockLibre.length > 0) {
+              stockLibre.sort(function(a,b){ return b.cajas - a.cajas; });
+              origenSugerido = stockLibre[0].cooler + ' (Disponible: ' + stockLibre[0].cajas + ' cjs)';
+            }
+          }
+
+          _trlLineas.push({
+            prioridad: r.Prioridad || 3,
+            fecha: r.Fecha || TODAY_STR,
+            ov: r.OV,
+            embarque_uni: r.OV,
+            embarque_dst: r.Destino || '',
+            cliente: r.Cliente || '',
+            sku: r.SKU,
+            cajas: deltaPendiente,
+            origen_sap: origenSugerido,
+            origen_nombre: origenSugerido.indexOf('SIN STOCK') >= 0 ? 'Esperando arribo' : _getCoolerNombre(origenSugerido.split(' ')[0]),
+            destino_sap: destCooler,
+            destino_nombre: _getCoolerNombre(destCooler),
+            nivel: 'En Proceso',
+            cercania: 'Déficit de Inventario',
+            accion: 'Faltan ' + deltaPendiente + ' piezas en ' + destCooler + ' para completar OV.'
+          });
+        }
+      }
+    });
+  }
+
   _trlIniciado = true;
-  // Poblar selects de origen/destino solo con los que tienen inventario
   var origenes = Array.from(new Set(_trlLineas.map(function(t){return t.origen_sap}).filter(Boolean))).sort();
   var destinos = Array.from(new Set(_trlLineas.map(function(t){return t.destino_sap}).filter(Boolean))).sort();
   selFill('flt-trl-origen',  origenes, 'Todos los orígenes');
@@ -5927,7 +5979,8 @@ function _drawCumTable() {
       + '<td style="padding:6px 12px;color:var(--accent);font-family:monospace;font-size:11px;font-weight:600">' + escapeHtml(r.ov||'') + '</td>'
       + '<td style="padding:6px;text-align:center;font-size:10px;font-weight:700;color:'+prioCol+'">' + prioLabel + '</td>'
       + '<td style="padding:6px 8px;text-align:center;font-size:10px;color:var(--text3)">' + (r.fecha_plan||'—') + '</td>'
-      + '<td style="padding:6px 8px;text-align:center;font-size:10px;color:'+(r.fecha_sap?'var(--green)':'var(--text3)')+'">' + (r.fecha_sap||'—') + '</td>'
+      + '<td style="padding:6px 8px;text-align:center;font-size:10px;color:'+(r.fecha_sap?'var(--green)':'var(--text3)')+'" title="Haga clic para editar la fecha de cierre">'
+        + (r.fecha_sap||'—') + ' <span style="cursor:pointer;color:var(--accent)" onclick="openEditFechaSap(\''+r.ov+'\')">✏️</span></td>'
       + '<td style="padding:6px 12px;font-size:10px;color:var(--text);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.cliente||'')+'">' + escapeHtml((r.cliente||'').slice(0,20)) + '</td>'
       + '<td style="padding:6px 8px;font-size:10px;color:var(--text3);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(r.destino||'')+'">' + escapeHtml((r.destino||'').slice(0,14)) + '</td>'
       + '<td style="padding:6px 8px;text-align:right;font-family:monospace;font-size:10px;color:var(--text)">' + fmt(r.pedido||0) + '</td>'
@@ -6166,9 +6219,70 @@ function _aplicarFiltrosYOverridesGlobales() {
       });
     });
   }
+
+  // 5. Aplicar overrides de fecha de cierre (fecha_cierre_overrides)
+  if (!_dashboardOverrides.fecha_cierre_overrides) {
+    _dashboardOverrides.fecha_cierre_overrides = {};
+  }
+  var dateOvs = _dashboardOverrides.fecha_cierre_overrides || {};
+  
+  if (window.D && window.D.cumplimiento_sap && Array.isArray(window.D.cumplimiento_sap.ovs)) {
+    window.D.cumplimiento_sap.ovs.forEach(function(o) {
+      if (dateOvs[o.ov]) {
+        o.fecha_sap = dateOvs[o.ov];
+        if (o.estado_sap === 'PENDIENTE') {
+          o.estado_sap = 'DESPACHADA';
+        }
+      }
+    });
+  }
+
+  if (window.SE_DATA) {
+    window.SE_DATA.forEach(function(s) {
+      if (dateOvs[s.docnum]) {
+        s.fecha_salida = dateOvs[s.docnum];
+      }
+    });
+  }
   
   window._seData = window.SE_DATA || [];
   try { _buildCoolersMap(); } catch(e) {}
+}
+
+async function openEditFechaSap(ovId) {
+  if (!_dashboardOverrides.fecha_cierre_overrides) {
+    _dashboardOverrides.fecha_cierre_overrides = {};
+  }
+  var currentVal = _dashboardOverrides.fecha_cierre_overrides[ovId] || '';
+  if (!currentVal && window.D && window.D.cumplimiento_sap && Array.isArray(window.D.cumplimiento_sap.ovs)) {
+    var match = window.D.cumplimiento_sap.ovs.find(function(o){ return String(o.ov) === String(ovId); });
+    if (match) currentVal = match.fecha_sap || '';
+  }
+  
+  var newVal = prompt('Mover fecha de cierre para la OV ' + ovId + ' (Formato: YYYY-MM-DD, o vacío para restaurar):', currentVal);
+  if (newVal === null) return;
+  
+  newVal = newVal.trim();
+  if (newVal !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(newVal)) {
+    alert('Formato inválido. Debe ser YYYY-MM-DD o vacío.');
+    return;
+  }
+
+  if (newVal === '') {
+    delete _dashboardOverrides.fecha_cierre_overrides[ovId];
+  } else {
+    _dashboardOverrides.fecha_cierre_overrides[ovId] = newVal;
+  }
+
+  var ok = await _apiWrite('bp_dashboard_overrides.json', _dashboardOverrides);
+  if (ok) {
+    _aplicarFiltrosYOverridesGlobales();
+    renderCumplimiento();
+    try { initEmbarquesDia(); } catch(err){}
+    alert('💾 Fecha de cierre actualizada exitosamente.');
+  } else {
+    alert('⚠️ Error al guardar en el servidor.');
+  }
 }
 
 
@@ -6973,10 +7087,33 @@ function _embQuitarOV(ov){
 
 function _buildEmbarquesDia(sourceData){
   var src = sourceData || D;
-  var ovs=(src.cumplimiento_sap||{}).ovs||[];
-  // Inject manually-added OVs that aren't already in the list
   var ovsMap={};
-  ovs.forEach(function(o){ovsMap[String(o.ov)]=true;});
+  var ovs=[];
+  
+  // 1. Cargar OVs activas/actuales
+  var activeOvs = (src.cumplimiento_sap || {}).ovs || [];
+  activeOvs.forEach(function(o) {
+    var k = String(o.ov);
+    ovsMap[k] = true;
+    ovs.push(JSON.parse(JSON.stringify(o)));
+  });
+  
+  // 2. Cargar OVs históricas de por_dia
+  var porDiaList = (src.cumplimiento_sap || {}).por_dia || [];
+  porDiaList.forEach(function(d) {
+    (d.ovs || []).forEach(function(o) {
+      var k = String(o.ov);
+      if (!ovsMap[k]) {
+        ovsMap[k] = true;
+        var oCopy = JSON.parse(JSON.stringify(o));
+        if (!oCopy.fecha_plan) oCopy.fecha_plan = d.fecha;
+        if (!oCopy.fecha_sap && oCopy.estado_sap === 'DESPACHADA') oCopy.fecha_sap = d.fecha;
+        ovs.push(oCopy);
+      }
+    });
+  });
+
+  // Inject manually-added OVs that aren't already in the list
   Object.keys(_embOvsAgregadas||{}).forEach(function(ov){
     if(ovsMap[ov])return;
     var a=_embOvsAgregadas[ov];
@@ -8503,6 +8640,61 @@ window.runDashboardAudit = function() {
     window._embManualShipments = origManualShipments;
   } catch(e) {
     assert(false, "Prueba 3 (Manual shipments autolimpieza) falló con excepción: " + e.message);
+  }
+
+  // Prueba 4: Traslados virtuales por déficit
+  try {
+    var origD = window.D;
+    window.D = {
+      plan_dia: {
+        lineas: [
+          { OV: "999003", SKU: "BLUCV01", Pedido: 100, Stock: 25, Prioridad: 1, Fecha: "2026-07-16", Cooler: "FPER", Cliente: "TEST CLI", Destino: "TEST DEST" }
+        ]
+      },
+      inventario: [
+        { sku: "BLUCV01", cooler: "FTAL", cajas: 50 }
+      ],
+      traslados: []
+    };
+    
+    initTraslados();
+    var virtualTr = _trlLineas.find(function(t){ return String(t.ov) === "999003"; });
+    assert(virtualTr !== undefined, "Se genera un traslado en proceso por déficit.");
+    if (virtualTr) {
+      assert(virtualTr.cajas === 75, "La cantidad del traslado coincide con el déficit.");
+      assert(virtualTr.origen_sap.indexOf("FTAL") >= 0, "Sugiere origen de stock libre.");
+      assert(virtualTr.nivel === "En Proceso", "El nivel es 'En Proceso'.");
+    }
+    
+    window.D = origD;
+  } catch(e) {
+    assert(false, "Prueba 4 (Deficit transfers) falló con excepción: " + e.message);
+  }
+
+  // Prueba 5: Fusión de OVs históricas en Cierre de Embarques
+  try {
+    var origD = window.D;
+    window.D = {
+      cumplimiento_sap: {
+        ovs: [{ ov: "888001", pedido: 100, vendido_sap: 0, estado_sap: "PENDIENTE", fecha_plan: "2026-07-16" }],
+        por_dia: [
+          {
+            fecha: "2026-07-15",
+            ovs: [
+              { ov: "888002", pedido: 50, vendido_sap: 50, estado_sap: "DESPACHADA" }
+            ]
+          }
+        ]
+      }
+    };
+    
+    var compiled = _buildEmbarquesDia(window.D);
+    assert(compiled.embarques["OV-888001"] !== undefined, "Carga OVs activas.");
+    assert(compiled.embarques["OV-888002"] !== undefined, "Carga OVs históricas del por_dia.");
+    
+    window.D = origD;
+  } catch(e) {
+    assert(false, "Prueba 5 (Historical OVs Cierre) falló con excepción: " + e.message);
   }
 
   // Reporte Final

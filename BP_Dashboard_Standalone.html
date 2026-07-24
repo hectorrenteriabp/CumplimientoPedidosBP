@@ -3595,14 +3595,42 @@ function initTraslados() {
   var td = (D.traslados && D.traslados.lineas) ? D.traslados.lineas : Array.isArray(D.traslados) ? D.traslados : [];
   _trlLineas = td.filter(function(t){ return t.nivel !== 'SIN_STOCK'; });
 
-  // ── Añadir Traslados en Proceso por déficit de OVs ──
+  // ── 1. Traslados Físicos asignados en Plan del Día (CoolerOrigen != Cooler) ──
   if (window.D && window.D.plan_dia && Array.isArray(window.D.plan_dia.lineas)) {
     window.D.plan_dia.lineas.forEach(function(r) {
-      var pedido = r.Pedido || 0;
+      var origCooler = r.CoolerOrigen || r.CoolerOriginal || '';
+      var destCooler = r.Cooler || 'FTAL';
       var stock = r.Stock || 0;
+
+      if (origCooler && destCooler && origCooler !== destCooler && stock > 0) {
+        var yaExiste = _trlLineas.some(function(t){
+          return String(t.ov) === String(r.OV) && String(t.sku) === String(r.SKU) && t.origen_sap === origCooler && t.destino_sap === destCooler;
+        });
+        if (!yaExiste) {
+          _trlLineas.push({
+            prioridad: r.Prioridad || 3,
+            fecha: r.Fecha || TODAY_STR,
+            ov: r.OV,
+            embarque_uni: r.OV,
+            embarque_dst: r.Destino || '',
+            cliente: r.Cliente || '',
+            sku: r.SKU,
+            cajas: stock,
+            origen_sap: origCooler,
+            origen_nombre: _getCoolerNombre(origCooler),
+            destino_sap: destCooler,
+            destino_nombre: _getCoolerNombre(destCooler),
+            nivel: 'COSECHA',
+            cercania: 'Traslado asignado',
+            accion: 'Mover ' + stock + ' cjs de ' + _getCoolerNombre(origCooler) + ' a ' + _getCoolerNombre(destCooler)
+          });
+        }
+      }
+
+      // ── 2. Traslados en Proceso por déficit ──
+      var pedido = r.Pedido || 0;
       var deficit = pedido - stock;
       if (deficit > 0) {
-        // Encontrar si este traslado ya está cubierto por un traslado automático en _trlLineas
         var cubierto = _trlLineas.reduce(function(acc, t) {
           if (String(t.ov) === String(r.OV) && String(t.sku) === String(r.SKU)) {
             return acc + (t.cajas || 0);
@@ -3612,18 +3640,16 @@ function initTraslados() {
 
         var deltaPendiente = deficit - cubierto;
         if (deltaPendiente > 0) {
-          // Determinar cooler destino
-          var destCooler = r.Cooler || 'FTAL';
-          
-          // Buscar si hay stock disponible libre (no asignado) en otros coolers para este SKU
           var origenSugerido = 'SIN STOCK (Por recibir)';
           if (window.D && Array.isArray(window.D.inventario)) {
             var stockLibre = window.D.inventario.filter(function(inv) {
-              return inv.sku === r.SKU && inv.cooler !== destCooler && inv.cajas > 0;
+              var cCode = inv.cooler || inv.Cooler || '';
+              return inv.sku === r.SKU && cCode !== destCooler && (inv.cajas || inv.Cajas || 0) > 0;
             });
             if (stockLibre.length > 0) {
-              stockLibre.sort(function(a,b){ return b.cajas - a.cajas; });
-              origenSugerido = stockLibre[0].cooler + ' (Disponible: ' + stockLibre[0].cajas + ' cjs)';
+              stockLibre.sort(function(a,b){ return (b.cajas||b.Cajas||0) - (a.cajas||a.Cajas||0); });
+              var topCooler = stockLibre[0].cooler || stockLibre[0].Cooler || '';
+              origenSugerido = topCooler + ' (Disponible: ' + (stockLibre[0].cajas || stockLibre[0].Cajas || 0) + ' cjs)';
             }
           }
 
@@ -3768,17 +3794,35 @@ function exportPlanDia(){
   var _ovCI={},_n=0;
   sorted.forEach(function(r){var o=r.OV||'';if(!(o in _ovCI))_ovCI[o]=_n++;});
 
-  var cols=['OV','Fecha','EsRetraso','Prioridad','Cliente','Consignatario','Destino','SKU','Fruta',
-            'Pedido','Stock','Faltante','PctCumplimiento','PalletsPedido','PalletsStock','PalletsFaltantes',
-            'Cooler','TipoEnvio','Estatus','Comentarios'];
-  var widths=[10,12,9,7,30,24,18,24,10,8,8,8,10,12,12,12,8,10,14,32];
+  var cols = [
+    { header: 'OV', key: 'OV', width: 12 },
+    { header: 'Fecha', key: 'Fecha', width: 12 },
+    { header: 'Atraso', key: 'EsRetraso', width: 9 },
+    { header: 'Prioridad', key: 'Prioridad', width: 9 },
+    { header: 'Cliente', key: 'Cliente', width: 30 },
+    { header: 'Consignatario', key: 'Consignatario', width: 24 },
+    { header: 'Destino', key: 'Destino', width: 18 },
+    { header: 'SKU', key: 'SKU', width: 26 },
+    { header: 'Fruta', key: 'Fruta', width: 10 },
+    { header: 'Pedido', key: 'Pedido', width: 10 },
+    { header: 'Stock', key: 'Stock', width: 10 },
+    { header: 'Faltante', key: 'Faltante', width: 10 },
+    { header: '% Cumplimiento', key: 'PctCumplimiento', width: 15 },
+    { header: 'Pallets Pedido', key: 'PalletsPedido', width: 14 },
+    { header: 'Pallets Stock', key: 'PalletsStock', width: 14 },
+    { header: 'Pallets Faltantes', key: 'PalletsFaltantes', width: 14 },
+    { header: 'Cooler', key: 'Cooler', width: 10 },
+    { header: 'Tipo Envío', key: 'TipoEnvio', width: 12 },
+    { header: 'Estatus', key: 'Estatus', width: 14 },
+    { header: 'Comentarios', key: 'Comentarios', width: 32 }
+  ];
 
   var wb=new ExcelJS.Workbook();
   wb.creator='BP Dashboard'; wb.created=new Date();
   var ws=wb.addWorksheet('Plan del Día',{views:[{state:'frozen',ySplit:1}]});
 
   // Columnas con anchos
-  ws.columns=cols.map(function(k,i){return{header:k,key:k,width:widths[i]};});
+  ws.columns = cols;
 
   // Estilo encabezado
   ws.getRow(1).eachCell(function(cell){
@@ -6403,19 +6447,37 @@ function _procesarYAutolimpiarManualShipments() {
     }
   });
 
-  // Helper check
+  // Helper check: determina si una OV ya fue despachada o facturada en SAP
   function checkIfOvIsDespachada(ovId) {
-    if (window.D && window.D.cumplimiento_sap && Array.isArray(window.D.cumplimiento_sap.ovs)) {
-      var match = window.D.cumplimiento_sap.ovs.find(function(o){ return String(o.ov) === String(ovId); });
-      if (match) {
-        return match.estado_sap === 'DESPACHADA' || match.pct_sap >= 95;
+    var strOv = String(ovId).trim();
+    if (!strOv) return false;
+    if (window.D && window.D.cumplimiento_sap) {
+      if (Array.isArray(window.D.cumplimiento_sap.ovs)) {
+        var match = window.D.cumplimiento_sap.ovs.find(function(o){ return String(o.ov).trim() === strOv; });
+        if (match) {
+          if (match.estado_sap === 'DESPACHADA' || (match.vendido_sap || 0) > 0 || match.pct_sap >= 90) return true;
+        }
+      }
+      if (Array.isArray(window.D.cumplimiento_sap.por_dia)) {
+        var matchHist = false;
+        window.D.cumplimiento_sap.por_dia.forEach(function(d){
+          (d.ovs || []).forEach(function(o){
+            if (String(o.ov).trim() === strOv && (o.estado_sap === 'DESPACHADA' || (o.vendido_sap || 0) > 0)) {
+              matchHist = true;
+            }
+          });
+        });
+        if (matchHist) return true;
       }
     }
     if (window.D && window.D.plan_dia && Array.isArray(window.D.plan_dia.lineas)) {
-      var match2 = window.D.plan_dia.lineas.filter(function(l){ return String(l.OV) === String(ovId); });
-      if (match2.length > 0) {
-        return match2.every(function(l){ return l.Estatus === 'Completa' && l.Stock >= l.Pedido; });
+      var match2 = window.D.plan_dia.lineas.filter(function(l){ return String(l.OV).trim() === strOv; });
+      if (match2.length > 0 && match2.every(function(l){ return l.Estatus === 'Completa' || (l.Stock > 0 && l.Stock >= l.Pedido); })) {
+        return true;
       }
+    }
+    if (window.SE_DATA && Array.isArray(window.SE_DATA)) {
+      if (window.SE_DATA.some(function(s){ return String(s.docnum).trim() === strOv && (s.factura || (s.cajas || 0) > 0); })) return true;
     }
     return false;
   }
@@ -7340,7 +7402,9 @@ async function initEmbarquesDia(){
       d.embs.forEach(function(e){
         var eIcon=e.status==='DESPACHADO'?'✅':e.status==='PARCIAL'?'⚡':'🕐';
         var eCol=e.status==='DESPACHADO'?'var(--green)':e.status==='PARCIAL'?'var(--yellow)':'var(--red)';
-        var ovList=e.ovs.map(function(o){return o.ov;}).join(', ');
+        var ovsWithPencil = e.ovs.map(function(o){
+          return '<span>OV ' + escapeHtml(o.ov) + ' <span style="cursor:pointer;color:var(--accent);font-size:11px" title="Mover fecha de cierre de OV ' + escapeHtml(o.ov) + '" onclick="openEditFechaSap(\''+o.ov+'\');event.stopPropagation()">✏️</span></span>';
+        }).join(' · ');
         var clientes=[];
         var allSkus=[];
         e.ovs.forEach(function(o){
@@ -7368,7 +7432,7 @@ async function initEmbarquesDia(){
           +'<span style="font-size:10px;color:var(--text3);font-weight:600">'+e.ovs.length+' OV'+(e.ovs.length!==1?'s':'')+'</span>'
           +(tieneAgregadas?'<span onclick="_embQuitarOV(\''+ovsAgr[0].ov+'\');event.stopPropagation()" style="font-size:9px;color:#EF4444;cursor:pointer;padding:2px 8px;border:1px solid rgba(239,68,68,.3);border-radius:10px;font-weight:700" title="Quitar OV agregada">✕ Quitar</span>':'')
           +'</div>'
-          +'<div style="font-size:10px;color:var(--text3);margin-top:3px">'+escapeHtml(ovList)+(clientes.length?' · <span style="font-weight:600">'+escapeHtml(clientes.join(', '))+'</span>':'')+'</div>'
+          +'<div style="font-size:10px;color:var(--text3);margin-top:3px">'+ovsWithPencil+(clientes.length?' · <span style="font-weight:600">'+escapeHtml(clientes.join(', '))+'</span>':'')+'</div>'
           +(skuTxt?'<div style="font-size:9px;color:var(--accent);margin-top:3px;font-weight:600;opacity:.75">SKUs: '+escapeHtml(skuTxt)+'</div>':'')
           +'</td>'
           +'<td style="padding:8px 14px;text-align:center">'

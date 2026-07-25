@@ -6523,10 +6523,15 @@ async function _cargarDatosPersistentesFallback(){
       console.warn('Fallo al conectar con Cloud API, usando localStorage:', e);
     }
 
-    // Fallbacks locales si no hay datos en la nube
-    if (rdata && Object.keys(rdata).length) {
+    // Prioridad de datos globales D:
+    // 1. Datos provenientes de Cloud API (si se subió un Excel en Vercel)
+    // 2. Si D ya existe en el HTML (precargado por python / standalone), MANTENERLO
+    // 3. Solo usar localStorage como último recurso si D está totalmente vacío
+    if (rdata && Object.keys(rdata).length && window.D !== rdata && (rdata.plan_dia || rdata.cumplimiento_sap)) {
       window.D = rdata;
       console.log('Datos globales D cargados exitosamente desde la nube.');
+    } else if (window.D && (window.D.plan_dia || window.D.cumplimiento_sap)) {
+      console.log('Conservando datos globales D inyectados en HTML.');
     } else {
       try {
         var rdataLocal = JSON.parse(localStorage.getItem('bp_data.json') || '{}');
@@ -6541,6 +6546,9 @@ async function _cargarDatosPersistentesFallback(){
       window.SE_DATA = rse;
       window._seData = rse;
       console.log('Datos semáforo SE_DATA cargados exitosamente desde la nube.');
+    } else if (window.SE_DATA && window.SE_DATA.length) {
+      window._seData = window.SE_DATA;
+      console.log('Conservando SE_DATA inyectado en HTML.');
     } else {
       try {
         var rseLocal = JSON.parse(localStorage.getItem('bp_se_data.json') || '[]');

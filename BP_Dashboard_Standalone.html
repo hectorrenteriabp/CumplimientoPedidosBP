@@ -6332,6 +6332,47 @@ async function openEditFechaSap(ovId) {
   }
 }
 
+async function openEditFechaDia(fechaStr) {
+  var data = _buildEmbarquesDia(window.D);
+  var diaObj = (data.dias || []).find(function(d){ return d.fecha === fechaStr; });
+  if (!diaObj || !diaObj.embs || !diaObj.embs.length) {
+    alert('No se encontraron OVs para el día ' + fechaStr);
+    return;
+  }
+  var ovSet = new Set();
+  diaObj.embs.forEach(function(e){
+    (e.ovs || []).forEach(function(o){ if(o.ov) ovSet.add(String(o.ov)); });
+  });
+  var ovList = Array.from(ovSet);
+  if (!ovList.length) {
+    alert('No hay OVs editables para el día ' + fechaStr);
+    return;
+  }
+  var newVal = prompt('Mover fecha de cierre para TODAS las ' + ovList.length + ' OVs del día ' + fechaStr + ' (Formato: YYYY-MM-DD):', fechaStr);
+  if (newVal === null) return;
+  newVal = newVal.trim();
+  if (newVal !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(newVal)) {
+    alert('Formato inválido. Debe ser YYYY-MM-DD.');
+    return;
+  }
+  if (!_dashboardOverrides.fecha_cierre_overrides) {
+    _dashboardOverrides.fecha_cierre_overrides = {};
+  }
+  ovList.forEach(function(ovId){
+    if (newVal === '') delete _dashboardOverrides.fecha_cierre_overrides[ovId];
+    else _dashboardOverrides.fecha_cierre_overrides[ovId] = newVal;
+  });
+  var ok = await _apiWrite('bp_dashboard_overrides.json', _dashboardOverrides);
+  if (ok) {
+    _aplicarFiltrosYOverridesGlobales();
+    renderCumplimiento();
+    try { initEmbarquesDia(); } catch(err){}
+    alert('💾 Fechas de cierre actualizadas para ' + ovList.length + ' OVs del día ' + fechaStr);
+  } else {
+    alert('⚠️ Error al guardar en el servidor.');
+  }
+}
+
 
 // ── Mapa global de Coolers (SAP → Nombre) ──────────────────────────────
 // Construido dinámicamente desde plan_dia.lineas que SIEMPRE tiene CoolerNombre
@@ -7382,11 +7423,15 @@ async function initEmbarquesDia(){
     var colCj=pctCj>=90?'#10B981':pctCj>=50?'#F59E0B':'#EF4444';
     var colEmb=pctEmb>=90?'#10B981':pctEmb>=50?'#F59E0B':'#EF4444';
     var bg=i%2===0?'transparent':'rgba(255,255,255,.02)';
+    if(_embDiaExpandido[d.fecha]===undefined) _embDiaExpandido[d.fecha]=true;
     var isExp=!!_embDiaExpandido[d.fecha];
     var arrow=isExp?'▾':'▸';
     rows+='<tr style="border-bottom:1px solid var(--border);background:'+bg+';cursor:pointer;transition:background .15s" onmouseenter="this.style.background=\'rgba(21,101,192,.04)\'" onmouseleave="this.style.background=\''+bg+'\'" onclick="toggleDiaEmbarques(\''+d.fecha+'\')">'
       +'<td style="padding:10px 14px;font-size:12px;color:var(--text3)">'+arrow+'</td>'
-      +'<td style="padding:10px 14px;font-weight:700;color:var(--text);font-size:13px">'+escapeHtml(d.fecha)+'</td>'
+      +'<td style="padding:10px 14px;font-weight:700;color:var(--text);font-size:13px">'
+      +'<span>'+escapeHtml(d.fecha)+'</span>'
+      +'<button type="button" onclick="openEditFechaDia(\''+d.fecha+'\');event.stopPropagation()" style="margin-left:10px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);color:#1565C0;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer" title="Editar fecha de todas las OVs del día '+escapeHtml(d.fecha)+'">✏️ Mover fecha del día</button>'
+      +'</td>'
       +'<td style="padding:10px 14px;text-align:center;font-weight:700;font-size:14px;color:var(--text2)">'+d.nPlan+'</td>'
       +'<td style="padding:10px 14px;text-align:center;font-weight:800;font-size:14px;color:var(--green)">'+d.nDesp+'</td>'
       +'<td style="padding:10px 14px;text-align:center;font-weight:700;font-size:14px;color:'+(d.nPend?'var(--red)':'var(--text3)')+'">'+(d.nPend||'—')+'</td>'
@@ -7411,10 +7456,10 @@ async function initEmbarquesDia(){
         var eCol=e.status==='DESPACHADO'?'var(--green)':e.status==='PARCIAL'?'var(--yellow)':'var(--red)';
         var ovsWithPencil = e.ovs.map(function(o){
           var fDate = o.fecha_sap || o.fecha_plan || '';
-          return '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.85);border:1px solid var(--border);border-radius:6px;padding:3px 8px;margin:3px 6px 3px 0;font-size:11px;font-weight:700;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.05)">'
+          return '<div style="display:inline-flex;align-items:center;gap:6px;background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;padding:4px 10px;margin:3px 6px 3px 0;font-size:12px;font-weight:700;color:#0f172a;box-shadow:0 1px 4px rgba(0,0,0,0.08)">'
             + 'OV ' + escapeHtml(o.ov) + (o.cliente ? ' — ' + escapeHtml(o.cliente) : '')
-            + (fDate ? ' <span style="font-weight:500;color:var(--text3)">('+fDate+')</span>' : '')
-            + ' <button type="button" style="background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);color:#1565C0;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px;font-weight:700;margin-left:4px" title="Mover fecha de cierre de OV ' + escapeHtml(o.ov) + '" onclick="openEditFechaSap(\''+o.ov+'\');event.stopPropagation()">✏️ Cambiar fecha</button>'
+            + (fDate ? ' <span style="font-weight:600;color:#64748b">('+fDate+')</span>' : '')
+            + ' <button type="button" style="background:#1565C0;color:#ffffff;border:none;border-radius:4px;padding:3px 9px;cursor:pointer;font-size:11px;font-weight:800;margin-left:6px;box-shadow:0 1px 3px rgba(21,101,192,0.3)" title="Mover fecha de cierre de OV ' + escapeHtml(o.ov) + '" onclick="openEditFechaSap(\''+o.ov+'\');event.stopPropagation()">✏️ Cambiar fecha</button>'
             + '</div>';
         }).join('');
         var clientes=[];

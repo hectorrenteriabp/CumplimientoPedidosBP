@@ -3596,12 +3596,23 @@ function initTraslados() {
   var td = (D.traslados && D.traslados.lineas) ? D.traslados.lineas : Array.isArray(D.traslados) ? D.traslados : [];
   _trlLineas = td.filter(function(t){ return t.nivel !== 'SIN_STOCK'; });
 
-  // ── 1. Traslados Físicos asignados en Plan del Día (CoolerOrigen != Cooler) ──
+  // ── 1. Traslados Físicos y Reasignaciones Manuales en Plan del Día ──
   if (window.D && window.D.plan_dia && Array.isArray(window.D.plan_dia.lineas)) {
     window.D.plan_dia.lineas.forEach(function(r) {
+      var destCooler = r.Cooler || 'FPER';
+      var k = String(r.OV) + '|' + String(r.SKU);
+      var co = (_dashboardOverrides.cooler_overrides || {})[k];
+
       var origCooler = r.CoolerOrigen || r.CoolerOriginal || '';
-      var destCooler = r.Cooler || 'FTAL';
-      var stock = r.Stock || 0;
+      if (co && co.sap && co.sap !== destCooler) {
+        origCooler = co.sap;
+      }
+      if (!origCooler && Array.isArray(r.CoolerOpciones)) {
+        var optDiferente = r.CoolerOpciones.find(function(o){ return o.sap && o.sap !== destCooler && (o.stock || 0) > 0; });
+        if (optDiferente) origCooler = optDiferente.sap;
+      }
+
+      var stock = r.Stock || r.Pedido || 0;
 
       if (origCooler && destCooler && origCooler !== destCooler && stock > 0) {
         var yaExiste = _trlLineas.some(function(t){
@@ -3622,8 +3633,8 @@ function initTraslados() {
             destino_sap: destCooler,
             destino_nombre: _getCoolerNombre(destCooler),
             nivel: 'COSECHA',
-            cercania: 'Traslado asignado',
-            accion: 'Mover ' + stock + ' cjs de ' + _getCoolerNombre(origCooler) + ' a ' + _getCoolerNombre(destCooler)
+            cercania: 'Traslado Requerido',
+            accion: 'Mover ' + fmt(stock) + ' cjs de ' + _getCoolerNombre(origCooler) + ' a ' + _getCoolerNombre(destCooler)
           });
         }
       }
@@ -3780,8 +3791,23 @@ function exportPlanDia(){
   var HDR_ARGB='FF2E7D32';
   var HDR_FONT='FFE2EBF5';
 
-  // Ordenar: prioridad → fecha → OV → SKU (igual que la tabla)
+  // Mapeo de OVs consolidadas a su ID de Embarque/Consolidado
+  var ovToEmb = {};
+  ((D.cumplimiento_sap||{}).ovs || []).forEach(function(o){
+    if (o.ov && o.embarque_id) ovToEmb[String(o.ov)] = o.embarque_id;
+  });
+  Object.keys(_embConsolidaciones||{}).forEach(function(cid){
+    (_embConsolidaciones[cid].ovs||[]).forEach(function(ov){
+      ovToEmb[String(ov)] = cid;
+    });
+  });
+
+  // Ordenar: Embarque Consolidado → Prioridad → Fecha → OV → SKU
   var sorted=planDiaLineas.slice().sort(function(a,b){
+    var ea = ovToEmb[String(a.OV)] || '', eb = ovToEmb[String(b.OV)] || '';
+    if (ea && eb && ea !== eb) return ea.localeCompare(eb);
+    if (ea && !eb) return -1;
+    if (!ea && eb) return 1;
     var pa=(a.Prioridad||9),pb=(b.Prioridad||9);
     if(pa!==pb)return pa-pb;
     var fa=(a.Fecha||''),fb=(b.Fecha||'');
@@ -4243,6 +4269,21 @@ async function savePlanDiaModal() {
         if(o.sap && o.nombre) nameMap[o.sap] = o.nombre;
       });
     });
+
+    // Validar inventario disponible en el cooler de origen seleccionado
+    var targetLinea = (D.plan_dia.lineas || []).find(function(l){ return String(l.OV) === String(ov) && String(l.SKU) === String(sku); });
+    if (targetLinea && Array.isArray(targetLinea.CoolerOpciones)) {
+      var optSource = targetLinea.CoolerOpciones.find(function(o){ return o.sap === coolerSel; });
+      if (optSource && typeof optSource.stock === 'number') {
+        var invDisponible = optSource.stock;
+        var requestedCajas = cajasRaw !== '' ? parseFloat(cajasRaw) : (targetLinea.Pedido || 0);
+        if (requestedCajas > invDisponible) {
+          cajasRaw = String(invDisponible);
+          alert('⚠️ El inventario disponible en ' + (nameMap[coolerSel] || coolerSel) + ' para SKU ' + sku + ' es de ' + fmt(invDisponible) + ' cajas. Se ha ajustado la asignación al máximo disponible (' + fmt(invDisponible) + ' cajas), descontando el saldo a 0.');
+        }
+      }
+    }
+
     _dashboardOverrides.cooler_overrides[k] = {
       sap: coolerSel,
       nombre: nameMap[coolerSel] || coolerSel,
@@ -4833,9 +4874,9 @@ function renderEmbarques(){
     var isAllOvsDesp = (e.OVsDetalle || []).length > 0 && (e.OVsDetalle || []).every(function(v){
       var match = window.D && window.D.cumplimiento_sap && Array.isArray(window.D.cumplimiento_sap.ovs) && window.D.cumplimiento_sap.ovs.find(function(o){ return String(o.ov) === String(v.ov); });
       if (match) {
-        return match.estado_sap === 'DESPACHADA' || match.pct_sap >= 95;
+        return match.estado_sap === 'DESPACHADA' || match.pct_sap > 0 || (match.vendido_sap || 0) > 0;
       }
-      return v.pct >= 95;
+      return (v.pct || 0) > 0 || (v.cajas_vendidas || 0) > 0;
     });
     var logEst = log.estado || e.EstadoLogistico || (isAllOvsDesp ? 'DESPACHADO' : 'PENDIENTE');
     if(fLogist === 'ACTIVOS'){

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(BP_NO_PUBLICAR=1 BP_AUTORIZADO=1 py BP_Cumplimiento_Actualizador.py)",
+      "Bash(PYTHONIOENCODING=utf-8 PYTHONUTF8=1 BP_NO_PUBLICAR=1 BP_AUTORIZADO=1 py BP_Cumplimiento_Actualizador.py)",
+      "Bash(py -c ' *)",
+      "Bash(cmd /c BP_Actualizador.bat)",
+      "Bash(PYTHONIOENCODING=utf-8 PYTHONUTF8=1 BP_AUTORIZADO=1 py BP_Cumplimiento_Actualizador.py)"
+    ]
+  }
+}

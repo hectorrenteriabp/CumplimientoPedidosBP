@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(python3)",
+      "Bash(cp \"C:\\\\Users\\\\HectorFranciscoRente\\\\Dashboard\\\\CumpV2\\\\Dashboard cumplimiento de OVs\\\\.claude\\\\worktrees\\\\nice-spence-477f3d\\\\BP_Dashboard_Standalone.html\" \"C:\\\\Users\\\\HectorFranciscoRente\\\\Dashboard\\\\CumpV2\\\\Dashboard cumplimiento de OVs\\\\BP_Dashboard_Standalone.html\")"
+    ]
+  }
+}

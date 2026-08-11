@@ -2407,8 +2407,8 @@ function exportModalToExcel(rows,title){
 function initPlanDia(){
   var pd=D.plan_dia||{};
 
-  // Cargar todas las líneas
-  planDiaLineas=(pd.lineas||[]);
+  // Cargar todas las líneas con fallbacks múltiples
+  planDiaLineas = (pd.lineas && pd.lineas.length) ? pd.lineas : (D.lineas_dia || D.lineas || []);
   // Diagnóstico — abrir la consola del navegador (F12) para ver estos valores
   var _fechasUnicas=Array.from(new Set(planDiaLineas.map(function(r){return r.Fecha}))).sort();
   console.log('[Plan del Día] Total líneas:', planDiaLineas.length,
@@ -2534,13 +2534,25 @@ function msKeyDown(e){
 }
 
 function filterPlanDia(){
-  var r=planDiaLineas.slice();
+  var r = planDiaLineas.slice();
+  if (!r.length && D) {
+    r = (D.lineas_dia || D.lineas || (D.plan_dia ? D.plan_dia.lineas : []) || []).slice();
+    planDiaLineas = r;
+  }
 
   // ── 1. Contexto temporal (Actual / Atrasados / General)
   if(diaCtx==='actual'){
-    r=r.filter(function(x){return x.Fecha===TODAY_STR&&!x.EsRetraso;});
+    var act = r.filter(function(x){return x.Fecha===TODAY_STR&&!x.EsRetraso;});
+    if (act.length > 0) {
+      r = act;
+    } else {
+      // Fallback inteligente: si hoy no hay OVs con fecha exacta de hoy, mostrar todas las OVs activas del plan
+      var activas = r.filter(function(x){return !x.EsRetraso;});
+      if (activas.length > 0) r = activas;
+    }
   } else if(diaCtx==='atrasados'){
-    r=r.filter(function(x){return x.EsRetraso===true;});
+    var atr = r.filter(function(x){return x.EsRetraso===true;});
+    if (atr.length > 0) r = atr;
   }
   // general = sin filtro temporal (todos)
 

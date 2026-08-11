@@ -6632,15 +6632,26 @@ async function _cargarDatosPersistentesFallback(){
   try {
     var rc = {}, ro = {}, rcons = {}, rdata = {}, rsku = {}, rse = [], radded = [], rhst = {}, rdb = {};
     try {
-      rdata = await fetch('/api/datos?file=bp_data.json').then(res => res.ok ? res.json() : null) || {};
-      rse = await fetch('/api/datos?file=bp_se_data.json').then(res => res.ok ? res.json() : null) || [];
-      rsku = await fetch('/api/datos?file=bp_sku_overrides.json').then(res => res.ok ? res.json() : null) || {};
-      rc = await fetch('/api/datos?file=bp_comentarios.json').then(res => res.ok ? res.json() : null) || {};
-      ro = await fetch('/api/datos?file=bp_embarques_manual.json').then(res => res.ok ? res.json() : null) || {};
-      rcons = await fetch('/api/datos?file=bp_embarques_config.json').then(res => res.ok ? res.json() : null) || {};
-      radded = await fetch('/api/datos?file=bp_added_ovs.json').then(res => res.ok ? res.json() : null) || [];
-      rhst = await fetch('/api/datos?file=bp_historico_overrides.json').then(res => res.ok ? res.json() : null) || {};
-      rdb = await fetch('/api/datos?file=bp_dashboard_overrides.json').then(res => res.ok ? res.json() : null) || {};
+      const results = await Promise.all([
+        fetch('/api/datos?file=bp_data.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_se_data.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_sku_overrides.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_comentarios.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_embarques_manual.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_embarques_config.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_added_ovs.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_historico_overrides.json').then(res => res.ok ? res.json() : null).catch(() => null),
+        fetch('/api/datos?file=bp_dashboard_overrides.json').then(res => res.ok ? res.json() : null).catch(() => null)
+      ]);
+      rdata = results[0] || {};
+      rse = results[1] || [];
+      rsku = results[2] || {};
+      rc = results[3] || {};
+      ro = results[4] || {};
+      rcons = results[5] || {};
+      radded = results[6] || [];
+      rhst = results[7] || {};
+      rdb = results[8] || {};
     } catch(e) {
       console.warn('Fallo al conectar con Cloud API, usando localStorage:', e);
     }
@@ -7873,14 +7884,20 @@ function reinitAllViews() {
   _hstIniciado = false;
   _seData = window.SE_DATA || [];
 
-  // 2. Renderizar inmediatamente la pestaña visible para respuesta instantánea (0ms)
+  // 2. Renderizar inmediatamente las vistas principales
   try { initResumen(); } catch(e) { console.warn('initResumen:', e); }
+  try { initPlanDia(); } catch(e) { console.warn('initPlanDia:', e); }
+  try { renderCumplimiento(); } catch(e) { console.warn('renderCumplimiento:', e); }
 
-  // 3. Diferir la inicialización de vistas pesadas en diferido sin congelar la interfaz del navegador
-  setTimeout(function() {
-    try{ initPlanDia(); }       catch(e){ console.warn('initPlanDia:', e); }
-    try{ renderCumplimiento(); }catch(e){ console.warn('renderCumplimiento:', e); }
-  }, 50);
+  // 3. Forzar el re-dibujado de la pestaña actualmente activa en pantalla
+  var activePane = document.querySelector('.tab-pane.active');
+  if (activePane) {
+    var tabId = activePane.id.replace('t-', '');
+    if (tabId === 'plan-dia') { filterPlanDia(); }
+    else if (tabId === 'traslados') { initTraslados(); }
+    else if (tabId === 'embarques') { initEmbarques(); }
+    else if (tabId === 'historico') { initHistorico(); }
+  }
 }
 
 async function parseSemaforoPdf(arrayBuffer) {

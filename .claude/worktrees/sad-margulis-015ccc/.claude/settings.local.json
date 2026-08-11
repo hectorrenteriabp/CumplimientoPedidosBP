@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\HectorFranciscoRente\\\\Dashboard\\\\CumpV2\\\\Dashboard cumplimiento de OVs\\\\BP_Dashboard_Standalone.html\" -Pattern \"plan_dia|diaCtx|TODAY_STR|renderPlan\" | Select-Object -First 30 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line.Trim\\(\\)\\)\" })",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

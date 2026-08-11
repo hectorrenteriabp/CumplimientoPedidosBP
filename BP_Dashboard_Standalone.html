@@ -8207,12 +8207,14 @@ async function initLoginSystem() {
   if (Array.isArray(loadedUsers) && loadedUsers.length > 0) {
     window._listUsers = loadedUsers;
   } else {
-    // Cuentas del equipo registradas
+    // Cuentas del equipo registradas (nombres y usuarios de la empresa)
     window._listUsers = [
       {username: 'admin', password: 'bp', name: 'Hector Renteria', role: 'administrador'},
+      {username: 'ydiaz', password: 'bp', name: 'Yessenia Díaz', role: 'usuario'},
+      {username: 'yessenia', password: 'bp', name: 'Yessenia Díaz', role: 'usuario'},
       {username: 'nmoreno', password: 'bp', name: 'N. Moreno', role: 'usuario'},
-      {username: 'yessenia', password: 'bp', name: 'Yessenia', role: 'usuario'},
-      {username: 'luis', password: 'bp', name: 'Luis', role: 'usuario'},
+      {username: 'lsanchez', password: 'bp', name: 'Luis Sánchez', role: 'usuario'},
+      {username: 'luis', password: 'bp', name: 'Luis Sánchez', role: 'usuario'},
       {username: 'usuario', password: 'bp', name: 'Planificador BP', role: 'usuario'},
       {username: 'vista', password: 'bp', name: 'Consultor BP', role: 'solo_vista'}
     ];
@@ -8297,31 +8299,19 @@ function doLogin() {
   var errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
 
-  if (!uInput) {
+  if (!uInput || !pInput) {
     errEl.style.display = 'block';
-    document.getElementById('login-error-msg').textContent = 'Por favor ingresa tu usuario.';
+    document.getElementById('login-error-msg').textContent = 'Por favor ingresa usuario y contraseña.';
     return;
   }
 
-  // Permitir login flexible para admin o coincidencia exacta
-  if (uInput === 'admin') {
-    var adminUser = (window._listUsers || []).find(u => u.username === 'admin') || {username: 'admin', password: 'bp', name: 'Hector Renteria', role: 'administrador'};
-    setCurrentUser(adminUser);
-    return;
-  }
-
-  var match = (window._listUsers || []).find(u => u.username === uInput && (u.password === pInput || pInput === 'bp' || pInput === 'admin'));
+  var match = (window._listUsers || []).find(u => u.username.toLowerCase() === uInput && u.password === pInput);
   if (match) {
     setCurrentUser(match);
   } else {
     errEl.style.display = 'block';
-    document.getElementById('login-error-msg').textContent = 'Usuario o contraseña incorrectos. Intenta usuario: admin, contraseña: bp';
+    document.getElementById('login-error-msg').textContent = 'Usuario o contraseña incorrectos.';
   }
-}
-
-function quickLoginAdmin() {
-  var adminUser = (window._listUsers || []).find(u => u.username === 'admin') || {username: 'admin', password: 'bp', name: 'Hector Renteria', role: 'administrador'};
-  setCurrentUser(adminUser);
 }
 
 function logout() {

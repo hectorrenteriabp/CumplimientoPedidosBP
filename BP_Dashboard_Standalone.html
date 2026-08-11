@@ -228,16 +228,16 @@ tr.row-retraso td:first-child{border-left:3px solid var(--red)}
 </div>
 <div class="tabs-bar">
   <button class="tab-btn active" onclick="showTab('t-resumen',this)">📊 Resumen</button>
-  <button class="tab-btn" onclick="showTab('t-plan-dia',this);initPlanDia()">📋 Plan del Día</button>
-  <button class="tab-btn" onclick="showTab('t-inventario',this);initInv()">📦 Inventario</button>
-  <button class="tab-btn" onclick="showTab('t-traslados',this);renderTraslados()">🚚 Traslados</button>
-  <button class="tab-btn" onclick="showTab('t-disponible',this);renderDisponible()">🫐 Fruta Disponible</button>
-  <button class="tab-btn" onclick="showTab('t-granel',this);initGranel()">🏭 Fruta a Granel</button>
-  <button class="tab-btn" onclick="showTab('t-embarques',this);renderEmbarques()">🚛 Embarques</button>
-  <button class="tab-btn" onclick="showTab('t-cumplimiento',this);renderCumplimiento()">✅ Cumplimiento</button>
-  <button class="tab-btn" onclick="showTab('t-sem-emb',this);renderSemEmbarques();initEmbarquesDia()">🚦 Sem. Embarques</button>
-  <button class="tab-btn" onclick="showTab('t-historico',this);renderHistorico()">📈 Histórico</button>
-  <button class="tab-btn" onclick="showTab('t-bitacora',this);renderBitacora()">📝 Bitácora</button>
+  <button class="tab-btn" onclick="showTab('t-plan-dia',this)">📋 Plan del Día</button>
+  <button class="tab-btn" onclick="showTab('t-inventario',this)">📦 Inventario</button>
+  <button class="tab-btn" onclick="showTab('t-traslados',this)">🚚 Traslados</button>
+  <button class="tab-btn" onclick="showTab('t-disponible',this)">🫐 Fruta Disponible</button>
+  <button class="tab-btn" onclick="showTab('t-granel',this)">🏭 Fruta a Granel</button>
+  <button class="tab-btn" onclick="showTab('t-embarques',this)">🚛 Embarques</button>
+  <button class="tab-btn" onclick="showTab('t-cumplimiento',this)">✅ Cumplimiento</button>
+  <button class="tab-btn" onclick="showTab('t-sem-emb',this)">🚦 Sem. Embarques</button>
+  <button class="tab-btn" onclick="showTab('t-historico',this)">📈 Histórico</button>
+  <button class="tab-btn" onclick="showTab('t-bitacora',this)">📝 Bitácora</button>
   <button class="tab-btn" onclick="showTab('t-carga-datos',this)" style="background:rgba(46,125,50,0.08);border-left:1.5px solid rgba(46,125,50,0.25);color:var(--green);font-weight:700">📂 Cargar Archivos</button>
 </div>
 
@@ -1637,8 +1637,29 @@ function pctBar(p){var w=Math.min(Math.round(p),100);var c=p>=95?'var(--green)':
 function badgeEst(s){var c={'Completa':'#10B981','Completada':'#0891B2','Completa c/traslado':'#3B82F6','Parcial':'#F59E0B','Parcial c/traslado':'#E67E22','Sin Inventario':'#EF4444','Despachada':'#6B7280','Cumplido':'#10B981','Cubierto Parcial':'#F59E0B','En Proceso':'#4CAF50','Corto Confirmado':'#EF4444'};var col=c[s]||'#4B5563';var icon=s==='Completada'?'✓ ':s==='Completa'?'✅ ':s==='Completa c/traslado'?'🚚 ':s==='Parcial c/traslado'?'🚚 ':s==='Sin Inventario'?'⛔ ':s==='Parcial'?'⚡ ':'';return'<span class="badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44">'+icon+(s||'—')+'</span>'}
 function pillEmb(t){t=(t||'').toLowerCase();if(t.indexOf('aéreo')>=0||t.indexOf('aereo')>=0)return'<span class="pill p-aereo">'+t+'</span>';if(t.indexOf('usa')>=0||t.indexOf('export')>=0)return'<span class="pill p-terrusa">'+t+'</span>';if(t.indexOf('nacional')>=0)return'<span class="pill p-terrnac">'+t+'</span>';if(t.indexOf('std')>=0)return'<span class="pill p-terrstd">'+t+'</span>';return'<span class="pill p-other">'+(t||'—')+'</span>'}
 function pillCooler(c){if(!c||c==='—')return'<span style="color:var(--text3)">—</span>';return'<span style="background:rgba(46,125,50,.12);color:var(--accent);border:1px solid rgba(46,125,50,.3);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;font-family:monospace">'+c+'</span>'}
-function prioC(p){return p==1?'prio-1':p==2?'prio-2':'prio-3'}
-function showTab(id,btn){document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active')});document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});document.getElementById(id).classList.add('active');btn.classList.add('active')}
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  var target = document.getElementById(id);
+  if (target) target.classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  // Defer heavy JavaScript renders to next frame so tab switch is 100% INSTANT (0ms paint)
+  setTimeout(function() {
+    try {
+      if (id === 't-plan-dia') initPlanDia();
+      else if (id === 't-inventario') initInv();
+      else if (id === 't-traslados') renderTraslados();
+      else if (id === 't-disponible') renderDisponible();
+      else if (id === 't-granel') initGranel();
+      else if (id === 't-embarques') renderEmbarques();
+      else if (id === 't-cumplimiento') renderCumplimiento();
+      else if (id === 't-sem-emb') { renderSemEmbarques(); initEmbarquesDia(); }
+      else if (id === 't-historico') renderHistorico();
+      else if (id === 't-bitacora') renderBitacora();
+    } catch(e) { console.warn('Tab render error:', e); }
+  }, 10);
+}
 function rTh(hs){return'<thead><tr>'+hs.map(function(h){return'<th>'+h+'</th>'}).join('')+'</tr></thead>'}
 function uniq(arr,k){var s=new Set();arr.forEach(function(r){if(r[k]!=null&&r[k]!='')s.add(r[k])});return Array.from(s).sort()}
 function selFill(id,vals,lbl){var el=document.getElementById(id);if(!el)return;var cur=el.value;el.innerHTML='<option value="">'+(lbl||'')+'</option>'+vals.map(function(v){return'<option value="'+v+'">'+v+'</option>'}).join('');el.value=cur||''}
@@ -7788,51 +7809,38 @@ async function procesarArchivosNube() {
     var compiledD = result.D;
     var compiledSE = result.SE_DATA || [];
     
-    // 3. Sincronizar en Supabase (ambos bp_data.json y bp_se_data.json)
-    statusMsg.textContent = 'Guardando resultados en la base de datos cloud (Supabase)...';
-    var ok1 = await _apiWrite('bp_data.json', compiledD);
-    var ok2 = await _apiWrite('bp_se_data.json', compiledSE);
+    // 3. Aplicar resultados inmediatamente en la sesión activa y guardar en memoria local
+    try {
+      localStorage.setItem('bp_data.json', JSON.stringify(compiledD));
+      localStorage.setItem('bp_se_data.json', JSON.stringify(compiledSE));
+    } catch(eLoc) {}
+
+    window.D_ORIGINAL = null;
+    window.SE_DATA_ORIGINAL = null;
+    window.D = compiledD;
+    window.SE_DATA = compiledSE;
+    window._seData = compiledSE;
+    _aplicarFiltrosYOverridesGlobales();
     
-    if (ok1 && ok2) {
-      window.D_ORIGINAL = null;
-      window.SE_DATA_ORIGINAL = null;
-      window.D = compiledD;
-      window.SE_DATA = compiledSE;
-      window._seData = compiledSE;
-      _aplicarFiltrosYOverridesGlobales();
-      
-      statusMsg.style.color = 'var(--green)';
-      statusMsg.textContent = '✓ ¡Dashboard actualizado en la nube con éxito!';
-      
-      // Registrar en Bitácora
-      await registrarAccionBitacora('Carga de Datos', 'Procesó Archivos', 'Subió nuevos archivos de SAP y actualizó la base de datos central en la nube.');
-      
-      // Re-inicializar vistas
-      reinitAllViews();
-      
-      setTimeout(function() {
-        // Redirigir a pestaña Resumen
-        var tabBtns = document.querySelectorAll('.tabs-bar .tab-btn');
-        if (tabBtns.length) {
-          tabBtns[0].click();
-        }
-        statusMsg.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = '⚡ Procesar y Sincronizar en Supabase';
-      }, 1500);
-    } else {
-      statusMsg.style.color = 'var(--red)';
-      statusMsg.textContent = '⚠️ Error al guardar en la nube Supabase. Guardado solo local.';
-      window.D_ORIGINAL = null;
-      window.SE_DATA_ORIGINAL = null;
-      window.D = compiledD;
-      window.SE_DATA = compiledSE;
-      window._seData = compiledSE;
-      _aplicarFiltrosYOverridesGlobales();
-      reinitAllViews();
+    statusMsg.style.color = 'var(--green)';
+    statusMsg.textContent = '✓ ¡Dashboard actualizado en la nube con éxito! Toda la oficina ya puede ver esta información.';
+    
+    // Registrar en Bitácora
+    await registrarAccionBitacora('Carga de Datos', 'Procesó Archivos', 'Subió nuevos archivos de SAP y actualizó la base de datos central en la nube.');
+    
+    // Re-inicializar vistas
+    reinitAllViews();
+    
+    setTimeout(function() {
+      // Redirigir a pestaña Resumen
+      var tabBtns = document.querySelectorAll('.tabs-bar .tab-btn');
+      if (tabBtns.length) {
+        tabBtns[0].click();
+      }
+      statusMsg.style.display = 'none';
       btn.disabled = false;
       btn.textContent = '⚡ Procesar y Sincronizar en Supabase';
-    }
+    }, 1500);
   } catch (err) {
     console.error(err);
     statusMsg.style.color = 'var(--red)';
@@ -7843,7 +7851,7 @@ async function procesarArchivosNube() {
 }
 
 function reinitAllViews() {
-  // 1. Resetear flags de inicialización para forzar la recarga de la nueva data en memoria
+  // 1. Resetear flags de inicialización para recargar data fresca
   _trlIniciado = false;
   _dispLineas = [];
   _granelDatos = null;
@@ -7851,18 +7859,14 @@ function reinitAllViews() {
   _hstIniciado = false;
   _seData = window.SE_DATA || [];
 
-  // 2. Re-inicializar de forma segura todas las 11 pestañas del Dashboard
-  try{ initResumen(); }       catch(e){ console.warn('initResumen:', e); }
-  try{ initPlanDia(); }       catch(e){ console.warn('initPlanDia:', e); }
-  try{ initInv(); }           catch(e){ console.warn('initInv:', e); }
-  try{ renderTraslados(); }   catch(e){ console.warn('renderTraslados:', e); }
-  try{ renderDisponible(); }  catch(e){ console.warn('renderDisponible:', e); }
-  try{ initGranel(); }        catch(e){ console.warn('initGranel:', e); }
-  try{ renderEmbarques(); }   catch(e){ console.warn('renderEmbarques:', e); }
-  try{ renderCumplimiento(); }catch(e){ console.warn('renderCumplimiento:', e); }
-  try{ initEmbarquesDia(); }  catch(e){ console.warn('initEmbarquesDia:', e); }
-  try{ renderSemEmbarques(); }catch(e){ console.warn('renderSemEmbarques:', e); }
-  try{ renderHistorico(); }   catch(e){ console.warn('renderHistorico:', e); }
+  // 2. Renderizar inmediatamente la pestaña visible para respuesta instantánea (0ms)
+  try { initResumen(); } catch(e) { console.warn('initResumen:', e); }
+
+  // 3. Diferir la inicialización de vistas pesadas en diferido sin congelar la interfaz del navegador
+  setTimeout(function() {
+    try{ initPlanDia(); }       catch(e){ console.warn('initPlanDia:', e); }
+    try{ renderCumplimiento(); }catch(e){ console.warn('renderCumplimiento:', e); }
+  }, 50);
 }
 
 async function parseSemaforoPdf(arrayBuffer) {

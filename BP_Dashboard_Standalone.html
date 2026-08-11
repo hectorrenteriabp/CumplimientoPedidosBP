@@ -8207,9 +8207,12 @@ async function initLoginSystem() {
   if (Array.isArray(loadedUsers) && loadedUsers.length > 0) {
     window._listUsers = loadedUsers;
   } else {
-    // Valores por defecto
+    // Cuentas del equipo registradas
     window._listUsers = [
       {username: 'admin', password: 'bp', name: 'Hector Renteria', role: 'administrador'},
+      {username: 'nmoreno', password: 'bp', name: 'N. Moreno', role: 'usuario'},
+      {username: 'yessenia', password: 'bp', name: 'Yessenia', role: 'usuario'},
+      {username: 'luis', password: 'bp', name: 'Luis', role: 'usuario'},
       {username: 'usuario', password: 'bp', name: 'Planificador BP', role: 'usuario'},
       {username: 'vista', password: 'bp', name: 'Consultor BP', role: 'solo_vista'}
     ];

@@ -2405,10 +2405,11 @@ function exportModalToExcel(rows,title){
 //   → renderPlanDia()
 // ─────────────────────────────────────────
 function initPlanDia(){
-  var pd=D.plan_dia||{};
+  var sourceObj = (window.D && (window.D.plan_dia || window.D.lineas_dia)) ? window.D : (window.BP_DATA || {});
+  var pd = sourceObj.plan_dia || {};
 
   // Cargar todas las líneas con fallbacks múltiples
-  planDiaLineas = (pd.lineas && pd.lineas.length) ? pd.lineas : (D.lineas_dia || D.lineas || []);
+  planDiaLineas = (pd.lineas && pd.lineas.length) ? pd.lineas : (sourceObj.lineas_dia || sourceObj.lineas || []);
   // Diagnóstico — abrir la consola del navegador (F12) para ver estos valores
   var _fechasUnicas=Array.from(new Set(planDiaLineas.map(function(r){return r.Fecha}))).sort();
   console.log('[Plan del Día] Total líneas:', planDiaLineas.length,
@@ -6648,31 +6649,30 @@ async function _cargarDatosPersistentesFallback(){
     }
 
     // Prioridad de datos globales D:
-    // 1. Datos provenientes de Cloud API (si se subió un Excel en Vercel)
-    // 2. Si D ya existe en el HTML (precargado por python / standalone), MANTENERLO
-    // 3. Solo usar localStorage como último recurso si D está totalmente vacío
-    if (rdata && Object.keys(rdata).length && window.D !== rdata && (rdata.plan_dia || rdata.cumplimiento_sap)) {
+    // 1. Datos provenientes de Cloud API (/api/datos)
+    // 2. localStorage local ('bp_data.json')
+    // 3. Fallback: window.D estático inyectado en el HTML
+    if (rdata && Object.keys(rdata).length && (rdata.plan_dia || rdata.cumplimiento_sap || rdata.lineas_dia)) {
       window.D = rdata;
-      console.log('Datos globales D cargados exitosamente desde la nube.');
-    } else if (window.D && (window.D.plan_dia || window.D.cumplimiento_sap)) {
-      console.log('Conservando datos globales D inyectados en HTML.');
+      console.log('Datos globales D cargados exitosamente desde la nube (/api/datos).');
     } else {
       try {
         var rdataLocal = JSON.parse(localStorage.getItem('bp_data.json') || '{}');
-        if (rdataLocal && Object.keys(rdataLocal).length) {
+        if (rdataLocal && Object.keys(rdataLocal).length && (rdataLocal.plan_dia || rdataLocal.cumplimiento_sap || rdataLocal.lineas_dia)) {
           window.D = rdataLocal;
           console.log('Datos globales D cargados desde localStorage local.');
+        } else if (window.D && (window.D.plan_dia || window.D.cumplimiento_sap || window.D.lineas_dia)) {
+          console.log('Conservando datos globales D estáticos inyectados en HTML.');
         }
-      } catch(e){}
+      } catch(e) {
+        if (window.D) console.log('Conservando datos globales D estáticos.');
+      }
     }
 
     if (rse && rse.length) {
       window.SE_DATA = rse;
       window._seData = rse;
       console.log('Datos semáforo SE_DATA cargados exitosamente desde la nube.');
-    } else if (window.SE_DATA && window.SE_DATA.length) {
-      window._seData = window.SE_DATA;
-      console.log('Conservando SE_DATA inyectado en HTML.');
     } else {
       try {
         var rseLocal = JSON.parse(localStorage.getItem('bp_se_data.json') || '[]');
@@ -6680,6 +6680,9 @@ async function _cargarDatosPersistentesFallback(){
           window.SE_DATA = rseLocal;
           window._seData = rseLocal;
           console.log('Datos semáforo SE_DATA cargados desde localStorage local.');
+        } else if (window.SE_DATA && window.SE_DATA.length) {
+          window._seData = window.SE_DATA;
+          console.log('Conservando SE_DATA estático inyectado en HTML.');
         }
       } catch(e){}
     }
@@ -7825,7 +7828,9 @@ async function procesarArchivosNube() {
     try {
       localStorage.setItem('bp_data.json', JSON.stringify(compiledD));
       localStorage.setItem('bp_se_data.json', JSON.stringify(compiledSE));
-    } catch(eLoc) {}
+    } catch(eLoc) {
+      console.warn('Error guardando en localStorage:', eLoc);
+    }
 
     window.D_ORIGINAL = null;
     window.SE_DATA_ORIGINAL = null;

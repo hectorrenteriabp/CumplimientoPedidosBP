@@ -612,9 +612,12 @@ tr.row-retraso td:first-child{border-left:3px solid var(--red)}
 <div id="t-carga-datos" class="tab-pane">
   <div style="max-width:800px;margin:20px auto;padding:32px;background:var(--card);border:1.5px dashed var(--accent);border-radius:20px;text-align:center">
     <div style="font-size:42px;margin-bottom:14px">📂</div>
-    <h2 style="font-size:22px;font-weight:800;color:var(--accent);margin-bottom:8px">Cargar Archivos Fuente (Nube)</h2>
+    <div style="margin-bottom:12px">
+      <span style="background:rgba(0,192,255,0.15);color:#00C0FF;border:1px solid rgba(0,192,255,0.3);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">⚡ Conectado a Turso Cloud DB (bp-dashboard)</span>
+    </div>
+    <h2 style="font-size:22px;font-weight:800;color:var(--accent);margin-bottom:8px">Cargar Archivos Fuente — Turso Cloud Database</h2>
     <p style="font-size:12px;color:var(--text2);margin-bottom:24px">
-      Sube los archivos reales extraídos de SAP de forma directa. El Backend de Python en Vercel los procesará de forma autónoma utilizando el actualizador original.
+      Sube los archivos reales extraídos de SAP de forma directa. El Backend de Python en Vercel los procesará y los guardará permanentemente en Turso SQLite Cloud DB.
     </p>
 
     <!-- Dropzone -->
@@ -624,8 +627,8 @@ tr.row-retraso td:first-child{border-left:3px solid var(--red)}
          ondragleave="this.style.borderColor='var(--border)'; this.style.background='rgba(255,255,255,0.02)'"
          ondrop="handleCloudDrop(event)">
       <input type="file" id="cloud-file-input" multiple accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleCloudFiles(this.files)">
-      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Arrastra aquí tus archivos o haz clic para seleccionarlos</div>
-      <div style="font-size:11px;color:var(--text3)">Archivos soportados: Excel (.xlsx de pedidos) y Semáforo (.xlsx, .xls o .pdf de inventario)</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">📁 Haz clic aquí o arrastra tus archivos de Excel / PDF</div>
+      <div style="font-size:11px;color:var(--text3)">Archivos soportados: Cumplimiento BP.xlsx (pedidos) y Semaforo.pdf (inventario)</div>
     </div>
 
     <!-- Lista de archivos cargados -->
@@ -633,7 +636,7 @@ tr.row-retraso td:first-child{border-left:3px solid var(--red)}
       <h3 style="font-size:12px;font-weight:800;color:var(--accent);margin-bottom:10px">Archivos Seleccionados:</h3>
       <div id="cloud-files-container" style="display:flex;flex-direction:column;gap:8px"></div>
       <button onclick="procesarArchivosNube()" id="btn-cloud-process" style="margin-top:16px;width:100%;background:var(--green);border:none;border-radius:8px;padding:12px;color:#fff;font-weight:800;cursor:pointer;transition:all 0.2s">
-        ⚡ Procesar y Sincronizar en Supabase
+        ⚡ Procesar y Sincronizar en Turso Cloud DB
       </button>
     </div>
 
@@ -2543,14 +2546,8 @@ function filterPlanDia(){
 
   // ── 1. Contexto temporal (Actual / Atrasados / General)
   if(diaCtx==='actual'){
-    var act = r.filter(function(x){return x.Fecha===TODAY_STR&&!x.EsRetraso;});
-    if (act.length > 0) {
-      r = act;
-    } else {
-      // Fallback inteligente: si hoy no hay OVs con fecha exacta de hoy, mostrar todas las OVs activas del plan
-      var activas = r.filter(function(x){return !x.EsRetraso;});
-      if (activas.length > 0) r = activas;
-    }
+    // Vista Principal: desplegar el 100% de las OVs abiertas activas (tanto del día/ventana como atrasadas)
+    // para garantizar que el Plan del Día nunca aparezca en blanco o vacío
   } else if(diaCtx==='atrasados'){
     var atr = r.filter(function(x){return x.EsRetraso===true;});
     if (atr.length > 0) r = atr;
